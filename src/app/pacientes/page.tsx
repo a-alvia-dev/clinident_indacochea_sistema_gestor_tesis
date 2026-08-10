@@ -1,27 +1,29 @@
 import Link from 'next/link';
 import { obtenerPacientes } from './actions';
 
-export default async function PacientesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ q?: string }>;
-}) {
-  const params = await searchParams;
-  const busqueda = params?.q || '';
+interface PageProps {
+  searchParams: Promise<{ busqueda?: string }>;
+}
+
+export default async function PacientesPage({ searchParams }: PageProps) {
+  const { busqueda } = await searchParams;
   const pacientes = await obtenerPacientes(busqueda);
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 p-6 md:p-10 space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       
       {/* Encabezado */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100">Gestión de Pacientes</h1>
-          <p className="text-slate-400 text-sm">Administra y consulta las historias clínicas de Clinident.</p>
+          <h1 className="text-3xl font-bold text-slate-100">Gestión de Pacientes</h1>
+          <p className="text-slate-400 text-sm mt-1">
+            Administra y consulta las historias clínicas de Clinident.
+          </p>
         </div>
+
         <Link
           href="/pacientes/nuevo"
-          className="inline-flex items-center justify-center px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-blue-900/20"
+          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm rounded-xl transition-colors w-fit"
         >
           + Nuevo Paciente
         </Link>
@@ -31,53 +33,54 @@ export default async function PacientesPage({
       <form method="GET" className="max-w-md">
         <input
           type="text"
-          name="q"
-          defaultValue={busqueda}
+          name="busqueda"
+          defaultValue={busqueda || ''}
           placeholder="Buscar por nombre, apellido o cédula..."
-          className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+          className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-500 text-sm"
         />
       </form>
 
       {/* Tabla de Pacientes */}
-      <div className="bg-slate-800 rounded-2xl border border-slate-700/60 overflow-hidden shadow-xl">
-        {pacientes.length === 0 ? (
-          <div className="p-10 text-center text-slate-400">
-            <p className="text-lg font-medium">No se encontraron pacientes registrados.</p>
-            <p className="text-sm mt-1">Haz clic en "+ Nuevo Paciente" para añadir el primero.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-300">
-              <thead className="bg-slate-900/50 text-slate-400 font-semibold border-b border-slate-700">
-                <tr>
-                  <th className="p-4">Paciente</th>
-                  <th className="p-4">Cédula</th>
-                  <th className="p-4">Teléfono</th>
-                  <th className="p-4">Acción</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700/50">
-                {pacientes.map((p: any) => (
-                  <tr key={p.id} className="hover:bg-slate-700/30 transition-colors">
-                    <td className="p-4 font-medium text-slate-100">
-                      {p.nombres} {p.apellidos}
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden shadow-xl">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm text-slate-300">
+            <thead className="bg-slate-900/50 text-slate-400 font-medium border-b border-slate-700">
+              <tr>
+                <th className="p-4">Paciente</th>
+                <th className="p-4">Cédula</th>
+                <th className="p-4">Teléfono</th>
+                <th className="p-4 text-right">Acción</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700/60">
+              {pacientes && pacientes.length > 0 ? (
+                pacientes.map((paciente) => (
+                  <tr key={paciente.id} className="hover:bg-slate-700/30 transition-colors">
+                    <td className="p-4 font-semibold text-slate-100">
+                      {paciente.nombres} {paciente.apellidos}
                     </td>
-                    <td className="p-4 text-slate-400">{p.cedula || 'N/A'}</td>
-                    <td className="p-4 text-slate-400">{p.telefono || 'N/A'}</td>
-                    <td className="p-4">
+                    <td className="p-4 text-slate-400">{paciente.cedula || 'N/A'}</td>
+                    <td className="p-4 text-slate-400">{paciente.telefono || 'N/A'}</td>
+                    <td className="p-4 text-right">
                       <Link
-                        href={`/pacientes/${p.id}`}
-                        className="text-blue-400 hover:text-blue-300 font-medium text-xs bg-blue-500/10 border border-blue-500/20 px-3 py-1.5 rounded-lg transition-colors inline-block"
+                        href={`/pacientes/${paciente.id}`}
+                        className="px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/30 text-xs font-medium rounded-lg transition-colors inline-block"
                       >
                         Ver Historia Clínica →
                       </Link>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4} className="p-8 text-center text-slate-400">
+                    No se encontraron pacientes registrados.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
     </div>

@@ -1,76 +1,73 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { logoutAction } from '../app/login/logout-action';
+import { usePathname, useRouter } from 'next/navigation';
+import { createClient } from '../lib/supabase/client';
 
-interface SidebarProps {
-  usuarioNombre: string;
-  usuarioRol: string;
-}
-
-export default function Sidebar({ usuarioNombre, usuarioRol }: SidebarProps) {
+export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
 
-  const menuItems = [
-    { label: '📊 Dashboard', href: '/dashboard' },
-    { label: '👥 Pacientes', href: '/pacientes' },
-    { label: '📅 Citas y Agenda', href: '/citas' },
-    { label: '🦷 Tratamientos', href: '/tratamientos' },
-    { label: '💳 Pagos y Cajas', href: '/pagos' },
-  ];
-
-  // Si el usuario es ADMINISTRADOR u ODONTOLOGO principal, mostramos el menú de usuarios
-  const esAdmin = usuarioRol === 'ADMINISTRADOR' || usuarioRol === 'ODONTOLOGO';
-  if (esAdmin) {
-    menuItems.push({ label: '⚙️ Gestión de Personal', href: '/usuarios' });
+  // 🛑 Si la ruta actual es /login, no mostramos el Sidebar
+  if (pathname === '/login') {
+    return null;
   }
 
+  const handleCerrarSesion = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push('/login');
+    router.refresh();
+  };
+
+  const navLinks = [
+    { name: '📊 Dashboard', href: '/dashboard' },
+    { name: '👥 Pacientes', href: '/pacientes' },
+    { name: '📅 Citas y Agenda', href: '/citas' },
+    { name: '🦷 Tratamientos', href: '#' },
+    { name: '💳 Pagos y Cajas', href: '#' },
+    { name: '⚙️ Gestión de Personal', href: '/usuarios' },
+  ];
+
   return (
-    <aside className="w-64 bg-slate-800 border-r border-slate-700 min-h-screen flex flex-col justify-between p-4 text-slate-200 shrink-0">
-      <div className="space-y-6">
-        {/* Logo / Nombre de la clínica */}
-        <div className="px-2 pt-2">
-          <h1 className="text-2xl font-bold text-blue-400">Clinident</h1>
-          <p className="text-xs text-slate-400">Gestión Odontológica</p>
+    <aside className="w-64 bg-slate-950 border-r border-slate-800 flex flex-col justify-between shrink-0 h-screen">
+      <div className="p-6 space-y-8">
+        {/* Logo e Identidad */}
+        <div>
+          <h1 className="text-xl font-bold text-blue-500 tracking-wide">Clinident</h1>
+          <p className="text-xs text-slate-400 mt-0.5">Gestión Odontológica</p>
         </div>
 
         {/* Menú de Navegación */}
         <nav className="space-y-1">
-          {menuItems.map((item) => {
-            const isActive = pathname === item.href;
+          {navLinks.map((link) => {
+            const isActive = pathname === link.href;
             return (
               <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                key={link.name}
+                href={link.href}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors ${
                   isActive
-                    ? 'bg-blue-600 text-white font-semibold'
-                    : 'text-slate-300 hover:bg-slate-700 hover:text-slate-100'
+                    ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
                 }`}
               >
-                {item.label}
+                {link.name}
               </Link>
             );
           })}
         </nav>
       </div>
 
-      {/* Usuario actual y Logout */}
-      <div className="border-t border-slate-700 pt-4 space-y-3">
-        <div className="px-2">
-          <p className="text-sm font-semibold text-slate-100 truncate">{usuarioNombre}</p>
-          <p className="text-xs text-blue-400 font-mono uppercase">{usuarioRol}</p>
-        </div>
-
-        <form action={logoutAction}>
-          <button
-            type="submit"
-            className="w-full text-left px-4 py-2 text-xs font-semibold text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-lg transition-colors border border-red-500/20"
-          >
-            🚪 Cerrar Sesión
-          </button>
-        </form>
+      {/* Pie del Sidebar: Botón de Logout */}
+      <div className="p-6 border-t border-slate-800/60 space-y-4">
+        <button
+          onClick={handleCerrarSesion}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-xl text-sm font-medium transition-colors"
+        >
+          🚪 Cerrar Sesión
+        </button>
+        <p className="text-xs text-slate-500 text-center">Clinident Indacochea v1.0</p>
       </div>
     </aside>
   );
