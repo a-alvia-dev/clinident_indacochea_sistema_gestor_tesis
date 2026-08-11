@@ -48,28 +48,55 @@ export default async function TratamientoDetallePage({ params }: PageProps) {
       );
     }
 
-    const nombreCompleto = paciente.nombre || `${paciente.nombres || ''} ${paciente.apellidos || ''}`.trim() || 'Paciente sin nombre';
+    const nombreCompleto =
+      paciente.nombre ||
+      `${paciente.nombres || ''} ${paciente.apellidos || ''}`.trim() ||
+      'Paciente sin nombre';
 
     // Parseo seguro de piezas
     let piezasArray: any[] = [];
     if (historia?.piezas_dentales) {
-      if (Array.isArray(historia.piezas_dentales)) piezasArray = historia.piezas_dentales;
-      else if (typeof historia.piezas_dentales === 'string') {
-        try { piezasArray = JSON.parse(historia.piezas_dentales); } catch { piezasArray = []; }
+      if (Array.isArray(historia.piezas_dentales)) {
+        piezasArray = historia.piezas_dentales;
+      } else if (typeof historia.piezas_dentales === 'string') {
+        try {
+          piezasArray = JSON.parse(historia.piezas_dentales);
+        } catch {
+          piezasArray = [];
+        }
       }
     }
+
+    // Normalizar la estructura de las piezas
+    const piezasFormateadas = piezasArray.map((p) => {
+      if (typeof p === 'object' && p !== null) {
+        return {
+          numero_pieza: String(p.numero_pieza || p.numero || p.pieza || p.id || ''),
+          estado: p.estado || 'pendiente',
+        };
+      }
+      return { numero_pieza: String(p), estado: 'pendiente' };
+    });
 
     // Parseo seguro de alergias
     let alergiasArray: string[] = [];
     if (historia?.alergias) {
-      if (Array.isArray(historia.alergias)) alergiasArray = historia.alergias;
-      else if (typeof historia.alergias === 'string') {
-        try { alergiasArray = JSON.parse(historia.alergias); } catch { alergiasArray = [historia.alergias]; }
+      if (Array.isArray(historia.alergias)) {
+        alergiasArray = historia.alergias;
+      } else if (typeof historia.alergias === 'string') {
+        try {
+          alergiasArray = JSON.parse(historia.alergias);
+        } catch {
+          alergiasArray = [historia.alergias];
+        }
       }
     }
 
     const alergiasLimpias = Array.isArray(alergiasArray)
-      ? alergiasArray.filter((a: any) => typeof a === 'string' && a !== 'Ninguna Conocida' && a.trim() !== '')
+      ? alergiasArray.filter(
+          (a: any) =>
+            typeof a === 'string' && a !== 'Ninguna Conocida' && a.trim() !== ''
+        )
       : [];
 
     return (
@@ -140,7 +167,7 @@ export default async function TratamientoDetallePage({ params }: PageProps) {
                 <div>
                   <span className="text-slate-400 font-medium block">Piezas en Tratamiento</span>
                   <p className="font-semibold text-slate-700 mt-0.5">
-                    {piezasArray.length} pieza(s) diagnosticada(s)
+                    {piezasFormateadas.length} pieza(s) diagnosticada(s)
                   </p>
                 </div>
               </div>
@@ -153,6 +180,8 @@ export default async function TratamientoDetallePage({ params }: PageProps) {
               pacienteId={pacienteId}
               historiaId={historia?.id || ''}
               evolucionesIniciales={evoluciones || []}
+              piezasIniciales={piezasFormateadas}
+              estadoHistoriaInicial={historia?.estado || 'en_tratamiento'}
             />
           </div>
         </div>

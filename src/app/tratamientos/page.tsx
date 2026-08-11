@@ -107,6 +107,13 @@ export default async function TratamientosPage() {
               }
             }
 
+            // CÁLCULOS DINÁMICOS DE PROGRESO
+            const totalPiezas = piezasArray.length;
+            const piezasTratadas = piezasArray.filter((pieza: any) => 
+              typeof pieza === 'object' && pieza !== null && pieza.estado === 'tratada'
+            ).length;
+            const porcentajeProgreso = totalPiezas > 0 ? (piezasTratadas / totalPiezas) * 100 : 0;
+
             return (
               <div
                 key={historia.id}
@@ -141,16 +148,20 @@ export default async function TratamientosPage() {
                   </p>
                 </div>
 
+                {/* BLOQUE DE PROGRESO DINÁMICO */}
                 <div className="w-full md:w-64 space-y-2">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="font-semibold text-slate-600">Piezas Diagnosticadas</span>
-                    <span className="font-bold text-teal-700">{piezasArray.length} pieza(s)</span>
+                    <span className="font-semibold text-slate-600">Progreso Tratamiento</span>
+                    <span className="font-bold text-teal-700">
+                      {piezasTratadas} de {totalPiezas} curadas
+                    </span>
                   </div>
 
-                  <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                  {/* BARRA CORREGIDA Y ANIMADA */}
+                  <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60">
                     <div
                       className="h-full bg-teal-500 rounded-full transition-all duration-500"
-                      style={{ width: `${piezasArray.length > 0 ? 100 : 20}%` }}
+                      style={{ width: `${porcentajeProgreso}%` }}
                     />
                   </div>
 
