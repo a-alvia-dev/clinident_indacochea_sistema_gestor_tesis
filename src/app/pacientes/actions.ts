@@ -74,6 +74,7 @@ export async function crearPacienteAction(formData: FormData) {
   }
 
   revalidatePath('/pacientes');
+  revalidatePath('/tratamientos');
   return { success: true, paciente: data };
 }
 
@@ -119,6 +120,7 @@ export async function actualizarPacienteAction(id: string, formData: FormData) {
 
   revalidatePath('/pacientes');
   revalidatePath(`/pacientes/${id}`);
+  revalidatePath('/tratamientos');
   return { success: true };
 }
 
@@ -138,6 +140,7 @@ export async function eliminarPacienteAction(id: string) {
   }
 
   revalidatePath('/pacientes');
+  revalidatePath('/tratamientos');
   return { success: true };
 }
 
@@ -196,6 +199,7 @@ export async function aperturarHistoriaAction(formData: FormData) {
 
   revalidatePath('/pacientes');
   revalidatePath(`/pacientes/${pacienteId}`);
+  revalidatePath('/tratamientos'); // ⚡ Fuerza actualización inmediata del módulo Tratamientos
 
   return { success: true, data: historia };
 }
@@ -272,6 +276,7 @@ export async function actualizarHistoriaAction(historiaId: string, formData: For
 
   revalidatePath('/pacientes');
   revalidatePath(`/pacientes/${pacienteId}`);
+  revalidatePath('/tratamientos'); // ⚡ Fuerza actualización inmediata del módulo Tratamientos
   return { success: true };
 }
 
@@ -303,6 +308,7 @@ export async function eliminarHistoriaAction(historiaId: string, pacienteId: str
 
   revalidatePath('/pacientes');
   revalidatePath(`/pacientes/${pacienteId}`);
+  revalidatePath('/tratamientos'); // ⚡ Fuerza actualización inmediata del módulo Tratamientos
 
   return { success: true };
 }
