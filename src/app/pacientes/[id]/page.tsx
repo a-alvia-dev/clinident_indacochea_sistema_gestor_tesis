@@ -162,53 +162,78 @@ export default function DetallePacientePage({ params }: PageProps) {
   // FINALIZAR Y GUARDAR EN SUPABASE (CREAR / EDITAR)
   const handleFinalizarConsulta = (e: React.FormEvent) => {
     e.preventDefault();
+// --- 1. PROCESAMIENTO DINÁMICO DE DATOS INGRESADOS ---
 
+    // A. Procesar Antecedentes Sistémicos seleccionados
+    const antecedentesActivos = antecedentes.filter(a => a !== 'Ninguno' && a.trim() !== '');
+    const tieneAntecedentes = antecedentesActivos.length > 0;
+
+    // B. Identificar hallazgos clínicos específicos en el Odontograma
+    const tieneInfeccion = piezasClinicas.some(p => p.hallazgo?.includes('Infección') || p.hallazgo?.includes('Absceso'));
+    const tieneResto = piezasClinicas.some(p => p.hallazgo?.includes('Resto Radicular'));
+    const tieneFractura = piezasClinicas.some(p => p.hallazgo?.includes('Fractura'));
+    const tieneCaries = piezasClinicas.some(p => p.hallazgo?.includes('Caries'));
+
+    // C. Lista dinámica de piezas afectadas para el reporte
+    const resumenPiezas = piezasClinicas.map(p => `#${p.pieza} (${p.hallazgo})`).join(', ');
+
+    // --- 2. DETERMINACIÓN DEL SEMÁFORO Y DETALLE CLÍNICO ---
     let colorCalculado: 'rojo' | 'naranja' | 'verde' = 'verde';
     let razones: string[] = [];
 
-    // Evaluar estado del Odontograma
-    const tieneInfeccionGrave = piezasClinicas.some(p =>
-      p.hallazgo.includes('Infección') || p.hallazgo.includes('Absceso') || p.hallazgo.includes('Resto Radicular')
-    );
-    const tieneCariesOFrac = piezasClinicas.some(p =>
-      p.hallazgo.includes('Caries') || p.hallazgo.includes('Fractura')
-    );
-
-    // Evaluar Factores Sistémicos
-    const esCriticoSistemico = antecedentes.includes('Trastorno de Coagulación / Anticoagulado') || 
-                               antecedentes.includes('Cardiopatía / Soplo / Marcapasos') || 
-                               antecedentes.includes('Inmunocompromiso / Cáncer / Quimioterapia') ||
-                               fiebre === 'Sí';
-
+    // REGLA A: EVALUACIÓN DE ROJO (Urgencias / Riesgo Alto)
     if (nivelDolor >= 8) {
       colorCalculado = 'rojo';
-      razones.push(`Dolor agudo extremo (EVA ${nivelDolor}/10)`);
+      razones.push(`Nivel de dolor severo (EVA ${nivelDolor}/10)`);
     }
 
-    if (tieneInfeccionGrave) {
+    if (tieneInfeccion) {
       colorCalculado = 'rojo';
-      razones.push('Presencia de proceso infeccioso / absceso / resto radicular activo');
+      razones.push('Proceso infeccioso activo / absceso detectado');
     }
 
-    if (esCriticoSistemico && (nivelDolor >= 4 || tieneCariesOFrac || tieneInfeccionGrave)) {
+    if (tieneResto) {
       colorCalculado = 'rojo';
-      razones.push('Compromiso sistémico de alto riesgo (Anticoagulado / Cardiopatía / Cáncer / Fiebre)');
+      razones.push('Presencia de resto radicular');
     }
 
+    if (fiebre === 'Sí') {
+      colorCalculado = 'rojo';
+      razones.push('Cuadro febril activo (alerta de infección sistémica)');
+    }
+
+    // REGLA B: EVALUACIÓN DE NARANJA (Prioritario / Moderado)
     if (colorCalculado !== 'rojo') {
-      if (nivelDolor >= 4 || tieneCariesOFrac || antecedentes.includes('Diabetes Mellitus') || antecedentes.includes('Hipertensión Arterial')) {
+      if (nivelDolor >= 4) {
         colorCalculado = 'naranja';
-        if (nivelDolor >= 4) razones.push(`Dolor moderado (EVA ${nivelDolor}/10)`);
-        if (tieneCariesOFrac) razones.push('Lesiones dentales cavitadas (Caries / Fractura)');
-        if (antecedentes.includes('Diabetes Mellitus') || antecedentes.includes('Hipertensión Arterial')) {
-          razones.push('Enfermedad crónica de base requiere protocolo adaptado');
-        }
-      } else {
-        colorCalculado = 'verde';
-        razones.push('Paciente estable. Procedimiento estándar indicado sin criterios de urgencia');
+        razones.push(`Dolor moderado (EVA ${nivelDolor}/10)`);
+      }
+
+      if (tieneCaries || tieneFractura) {
+        colorCalculado = 'naranja';
+        razones.push('Lesiones dentales activas (Caries/Fractura)');
+      }
+
+      if (tieneAntecedentes) {
+        colorCalculado = 'naranja';
       }
     }
 
+    // REGLA C: INCLUSIÓN DINÁMICA DE ANTECEDENTES Y DETALLES EN LA DESCRIPCIÓN
+    if (tieneAntecedentes) {
+      razones.push(`Antecedentes médicos a considerar: ${antecedentesActivos.join(', ')}`);
+    }
+
+    if (resumenPiezas) {
+      razones.push(`Hallazgos en piezas: ${resumenPiezas}`);
+    }
+
+    // REGLA D: EVALUACIÓN DE VERDE (Atención de Rutina)
+    if (colorCalculado === 'verde') {
+      razones.push('Paciente estable sin criterios de urgencia ni comorbilidades activas');
+    }
+
+    // Construcción final de la descripción detallada
     const razonFinal = razones.join('. ') + '.';
 
     // Empaquetar formulario para Server Action
@@ -339,65 +364,108 @@ export default function DetallePacientePage({ params }: PageProps) {
 
       {/* SI YA ESTÁ FINALIZADO MOSTRAR RESUMEN + BOTONES DE ACCIÓN (EDITAR / ELIMINAR) */}
       {consultaFinalizada ? (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-6">
-          <div className="flex justify-between items-center border-b pb-3">
+       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 mt-6 space-y-6">
+        {/* CABECERA CON BOTONES */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div>
             <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-              Resumen Clínico Guardado en Supabase
+              Resumen Clínico Guardado
             </h2>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setConsultaFinalizada(false)}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg transition-all cursor-pointer"
-              >
-                ✏️ Modificar / Editar Historia
-              </button>
-              <button
-                type="button"
-                onClick={handleEliminarHistoria}
-                disabled={isPending}
-                className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-lg border border-red-200 transition-all cursor-pointer"
-              >
-                🗑️ Eliminar Historia
-              </button>
-            </div>
+            <p className="text-sm font-semibold text-slate-700 mt-1">
+              Ficha registrada correctamente en el sistema
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setConsultaFinalizada(false)}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5"
+            >
+              ✏️ Modificar / Editar Historia
+            </button>
+            <button
+              type="button"
+              onClick={handleEliminarHistoria}
+              disabled={isPending}
+              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5"
+            >
+              🗑️ Eliminar Historia
+            </button>
+          </div>
+        </div>
+
+        {/* GRILLA DE DATOS PRINCIPALES */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* 1. Motivo de Consulta */}
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+            <span className="text-xs font-bold text-slate-400 uppercase block mb-1">Motivo Principal</span>
+            <p className="text-sm font-bold text-slate-800">{motivoConsulta || 'Consulta general'}</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-              <span className="text-slate-400 font-medium block mb-1">Motivo:</span>
-              <span className="font-bold text-slate-900">{motivoConsulta}</span>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-              <span className="text-slate-400 font-medium block mb-1">Dolor Registrado:</span>
-              <span className="font-bold text-slate-900">EVA {nivelDolor}/10 ({tipoDolor})</span>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-              <span className="text-slate-400 font-medium block mb-1">Piezas Halladas:</span>
-              <span className="font-bold text-[#0284c7]">{piezasClinicas.length} Pieza(s) registradas</span>
-            </div>
+          {/* 2. Evaluación del Dolor */}
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+            <span className="text-xs font-bold text-slate-400 uppercase block mb-1">Dolor (Escala EVA)</span>
+            <p className="text-sm font-bold text-slate-800">
+              EVA {nivelDolor}/10 <span className="text-xs font-normal text-slate-500">({tipoDolor})</span>
+            </p>
           </div>
 
-          {/* LISTA DETALLADA DE PIEZAS EN MODO LECTURA */}
-          {piezasClinicas.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-xs font-bold text-slate-500 uppercase">Detalle del Odontograma:</h3>
-              <div className="divide-y border rounded-xl overflow-hidden text-xs">
-                {piezasClinicas.map(p => (
-                  <div key={p.pieza} className="p-3 bg-slate-50 flex justify-between items-center">
-                    <div>
-                      <span className="font-bold text-[#0284c7]">Pieza #{p.pieza}:</span> {p.hallazgo}
-                      {p.nota && <span className="text-slate-500 italic"> ({p.nota})</span>}
-                    </div>
-                    <span className="font-semibold text-slate-700 bg-white px-2 py-1 rounded border">
-                      Tratamiento: {p.tratamiento}
-                    </span>
-                  </div>
-                ))}
-              </div>
+          {/* 3. Fiebre / Signos Vitales */}
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+            <span className="text-xs font-bold text-slate-400 uppercase block mb-1">Presencia de Fiebre</span>
+            <p className={`text-sm font-bold ${fiebre === 'Sí' ? 'text-rose-600' : 'text-emerald-600'}`}>
+              {fiebre === 'Sí' ? '⚠️ Sí registrado' : '✓ No presenta'}
+            </p>
+          </div>
+
+          {/* 4. Total de Piezas en Odontograma */}
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+            <span className="text-xs font-bold text-slate-400 uppercase block mb-1">Piezas Registradas</span>
+            <p className="text-sm font-bold text-sky-600">
+              {piezasClinicas.length} Pieza(s) examinada(s)
+            </p>
+          </div>
+        </div>
+
+        {/* ANTECEDENTES MÉDICOS SISTÉMICOS */}
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
+          <span className="text-xs font-bold text-slate-400 uppercase block">Antecedentes Médicos de Base</span>
+          {antecedentes.filter(a => a !== 'Ninguno').length > 0 ? (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {antecedentes.filter(a => a !== 'Ninguno').map((ant, idx) => (
+                <span key={idx} className="px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 text-xs font-medium rounded-md">
+                  • {ant}
+                </span>
+              ))}
             </div>
+          ) : (
+            <p className="text-xs font-medium text-slate-500">Sin antecedentes médicos sistémicos declarados.</p>
           )}
         </div>
+
+        {/* DETALLE DEL ODONTOGRAMA */}
+        <div className="space-y-3">
+          <span className="text-xs font-bold text-slate-400 uppercase block">Detalle Clínico por Pieza Dental</span>
+          {piezasClinicas.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {piezasClinicas.map((p, idx) => (
+                <div key={idx} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-xl">
+                  <div>
+                    <span className="text-xs font-bold text-sky-600">Pieza #{p.pieza}</span>
+                    <p className="text-xs font-medium text-slate-700">{p.hallazgo}</p>
+                  </div>
+                  <span className="text-[11px] font-semibold bg-slate-100 text-slate-600 px-2 py-1 rounded-md">
+                    Tratamiento: {p.tratamiento}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400 italic">No se registraron hallazgos específicos en las piezas dentales.</p>
+          )}
+        </div>
+      </div>
       ) : (
         /* FORMULARIO COMPLETO DE TRIAJE Y ODONTOGRAMA (CREAR O EDITAR) */
         <form onSubmit={handleFinalizarConsulta} className="space-y-6">
@@ -876,7 +944,7 @@ export default function DetallePacientePage({ params }: PageProps) {
             disabled={isPending}
             className="w-full py-4 bg-slate-900 text-white rounded-2xl font-extrabold text-base hover:bg-slate-800 transition-all shadow-md cursor-pointer"
           >
-            {isPending ? 'Guardando en Supabase...' : historiaId ? 'Actualizar Historia Clínica y Recalcular' : 'Finalizar Consulta y Calcular Semáforo'}
+            {isPending ? 'Guardando...' : historiaId ? 'Actualizar Historia Clínica y Recalcular' : 'Finalizar Consulta y Calcular Semáforo'}
           </button>
 
         </form>
