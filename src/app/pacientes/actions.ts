@@ -194,3 +194,9 @@ export async function aperturarHistoriaAction(formData: FormData) {
 
   return { success: true, color, razon };
 }
+
+// 7. Actualización rápida para la Fila Desplegable
+export async function actualizarPacienteRapido(formData: FormData) {
+  const id = formData.get('id') as string;
+  return await actualizarPacienteAction(id, formData);
+}
