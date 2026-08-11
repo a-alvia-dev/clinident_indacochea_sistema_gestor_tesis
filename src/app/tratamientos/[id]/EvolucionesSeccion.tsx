@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Check, FileText, Calendar, Trash2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Plus, Check, FileText, Calendar, Trash2, CheckCircle2, AlertCircle, Lock } from 'lucide-react';
 import { createClient } from '../../../lib/supabase/client';
 
 interface Props {
@@ -10,6 +10,8 @@ interface Props {
   evolucionesIniciales: any[];
   piezasIniciales?: any[];
   estadoHistoriaInicial?: string;
+  // Callback opcional para avisar al componente padre cuando las piezas o el estado cambien
+  onActualizarHistoria?: (nuevasPiezas: any[], nuevoEstado: string) => void;
 }
 
 export default function EvolucionesSeccion({
@@ -18,6 +20,7 @@ export default function EvolucionesSeccion({
   evolucionesIniciales,
   piezasIniciales = [],
   estadoHistoriaInicial = 'en_tratamiento',
+  onActualizarHistoria,
 }: Props) {
   const [evoluciones, setEvoluciones] = useState<any[]>(evolucionesIniciales);
   const [piezas, setPiezas] = useState<any[]>(piezasIniciales);
@@ -35,6 +38,19 @@ export default function EvolucionesSeccion({
   // Piezas pendientes y tratadas
   const piezasPendientes = piezas.filter((p) => p.estado !== 'tratada');
   const piezasTratadas = piezas.filter((p) => p.estado === 'tratada');
+
+  // Cálculo de Porcentaje de Progreso
+  const totalPiezas = piezas.length;
+  const porcentaje = totalPiezas > 0 ? Math.round((piezasTratadas.length / totalPiezas) * 100) : 0;
+
+  // Lógica de colores según el avance
+  const getEstilosProgreso = (pct: number) => {
+    if (pct === 100) return { bg: 'bg-emerald-500', text: 'text-emerald-600', badge: 'bg-emerald-50 border-emerald-200' };
+    if (pct >= 35) return { bg: 'bg-amber-500', text: 'text-amber-600', badge: 'bg-amber-50 border-amber-200' };
+    return { bg: 'bg-rose-500', text: 'text-rose-600', badge: 'bg-rose-50 border-rose-200' };
+  };
+
+  const estilosProgreso = getEstilosProgreso(porcentaje);
 
   const guardarEvolucion = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,16 +78,18 @@ export default function EvolucionesSeccion({
 
       if (error) throw error;
 
-      // Si seleccionó una pieza, actualizamos la columna piezas_dentales en historias_clinicas
+      let piezasActualizadas = [...piezas];
+
+      // Si seleccionó una pieza, actualizamos el array de piezas dentales
       if (piezaSeleccionada) {
-        const nuevasPiezas = piezas.map((p) =>
+        piezasActualizadas = piezas.map((p) =>
           p.numero_pieza === piezaSeleccionada ? { ...p, estado: 'tratada' } : p
         );
 
         if (historiaId) {
           const { error: errorPiezas } = await supabase
             .from('historias_clinicas')
-            .update({ piezas_dentales: JSON.stringify(nuevasPiezas) })
+            .update({ piezas_dentales: JSON.stringify(piezasActualizadas) })
             .eq('id', historiaId);
 
           if (errorPiezas) {
@@ -80,7 +98,12 @@ export default function EvolucionesSeccion({
         }
 
         // Actualizar el estado local
-        setPiezas(nuevasPiezas);
+        setPiezas(piezasActualizadas);
+      }
+
+      // Notificar al componente padre para que actualice la barra general si aplica
+      if (onActualizarHistoria) {
+        onActualizarHistoria(piezasActualizadas, estadoHistoria);
       }
 
       setEvoluciones([data, ...evoluciones]);
@@ -114,6 +137,11 @@ export default function EvolucionesSeccion({
       if (error) throw error;
 
       setEstadoHistoria(nuevoEstado);
+
+      // Notificar al padre el cambio de estado
+      if (onActualizarHistoria) {
+        onActualizarHistoria(piezas, nuevoEstado);
+      }
     } catch (err: any) {
       alert('Error al cambiar el estado de la historia: ' + (err.message || String(err)));
     } finally {
@@ -144,55 +172,84 @@ export default function EvolucionesSeccion({
 
   return (
     <div className="space-y-6">
-      {/* BANNER DE ESTADO DE ALTA / FINALIZADO */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs flex flex-wrap justify-between items-center gap-4">
-        <div className="flex items-center gap-3">
-          {estadoHistoria === 'finalizado' ? (
-            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
-              <CheckCircle2 className="w-6 h-6" />
+      {/* BANNER DE ESTADO Y BARRA DE PROGRESO */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-4">
+        <div className="flex flex-wrap justify-between items-center gap-4">
+          <div className="flex items-center gap-3">
+            {estadoHistoria === 'finalizado' ? (
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-600 flex items-center justify-center font-bold">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+            )}
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">
+                Estado del Tratamiento:{' '}
+                <span className={estadoHistoria === 'finalizado' ? 'text-emerald-600' : 'text-teal-600'}>
+                  {estadoHistoria === 'finalizado' ? 'Tratamiento Finalizado / Alta' : 'En Tratamiento'}
+                </span>
+              </h3>
+              <p className="text-xs text-slate-500">
+                {piezasTratadas.length} de {piezas.length} pieza(s) recuperada(s) / tratada(s)
+              </p>
             </div>
-          ) : (
-            <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-600 flex items-center justify-center font-bold">
-              <AlertCircle className="w-6 h-6" />
-            </div>
-          )}
+          </div>
+
           <div>
-            <h3 className="text-sm font-bold text-slate-800">
-              Estado del Tratamiento:{' '}
-              <span className={estadoHistoria === 'finalizado' ? 'text-emerald-600' : 'text-teal-600'}>
-                {estadoHistoria === 'finalizado' ? 'Tratamiento Finalizado / Alta' : 'En Tratamiento'}
-              </span>
-            </h3>
-            <p className="text-xs text-slate-500">
-              {piezasTratadas.length} de {piezas.length} pieza(s) recuperada(s) / tratada(s)
-            </p>
+            {estadoHistoria === 'finalizado' ? (
+              <button
+                onClick={() => cambiarEstadoHistoria('en_tratamiento')}
+                disabled={cargandoAlta}
+                className="px-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+              >
+                Reabrir Tratamiento
+              </button>
+            ) : (
+              <button
+                onClick={() => cambiarEstadoHistoria('finalizado')}
+                disabled={cargandoAlta}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Dar de Alta / Finalizar
+              </button>
+            )}
           </div>
         </div>
 
-        <div>
-          {estadoHistoria === 'finalizado' ? (
-            <button
-              onClick={() => cambiarEstadoHistoria('en_tratamiento')}
-              disabled={cargandoAlta}
-              className="px-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold rounded-xl transition-all cursor-pointer"
-            >
-              Reabrir Tratamiento
-            </button>
-          ) : (
-            <button
-              onClick={() => cambiarEstadoHistoria('finalizado')}
-              disabled={cargandoAlta}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              Dar de Alta / Finalizar
-            </button>
-          )}
-        </div>
+        {/* BARRA DE PROGRESO DINÁMICA DE COLORES */}
+        {totalPiezas > 0 && (
+          <div className="space-y-1.5 pt-2 border-t border-slate-100">
+            <div className="flex justify-between items-center text-xs font-bold">
+              <span className="text-slate-600">Avance de Curaciones</span>
+              <span className={estilosProgreso.text}>
+                {porcentaje}% Completado ({piezasTratadas.length}/{totalPiezas})
+              </span>
+            </div>
+            <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60">
+              <div
+                className={`h-full transition-all duration-500 ease-out ${estilosProgreso.bg}`}
+                style={{ width: `${porcentaje}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* CARD FORMULARIO: REGISTRAR NUEVA EVOLUCIÓN */}
-      {estadoHistoria !== 'finalizado' && (
+      {/* CARD FORMULARIO: REGISTRAR NUEVA EVOLUCIÓN (DESHABILITADO SI ESTÁ FINALIZADO) */}
+      {estadoHistoria === 'finalizado' ? (
+        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 text-center space-y-2">
+          <div className="w-8 h-8 rounded-full bg-slate-200/70 text-slate-500 flex items-center justify-center mx-auto">
+            <Lock className="w-4 h-4" />
+          </div>
+          <p className="text-xs font-semibold text-slate-600">
+            Este tratamiento está <span className="text-emerald-600 font-bold">finalizado</span>. Para registrar nuevos procedimientos debes reabrir la historia clínica.
+          </p>
+        </div>
+      ) : (
         <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-5">
           <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
             <Plus className="w-4 h-4 text-teal-600" />
@@ -225,7 +282,7 @@ export default function EvolucionesSeccion({
                   className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-slate-800"
                 >
                   <option value="">Ninguna / Consulta General</option>
-                  {/* MOSTRAR ÚNICAMENTE LAS PIEZAS PENDIENTES */}
+                  {/* SOLO SE MUESTRAN PIEZAS PENDIENTES */}
                   {piezasPendientes.map((p) => (
                     <option key={p.numero_pieza} value={p.numero_pieza}>
                       Pieza {p.numero_pieza} (Pendiente)
@@ -312,14 +369,16 @@ export default function EvolucionesSeccion({
                         Próx: {new Date(evo.proxima_cita).toLocaleDateString()}
                       </span>
                     )}
-                    <button
-                      onClick={() => eliminarEvolucion(evo.id)}
-                      disabled={eliminandoId === evo.id}
-                      className="text-slate-400 hover:text-rose-600 transition-colors p-1 rounded-md hover:bg-rose-50 cursor-pointer"
-                      title="Eliminar"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {estadoHistoria !== 'finalizado' && (
+                      <button
+                        onClick={() => eliminarEvolucion(evo.id)}
+                        disabled={eliminandoId === evo.id}
+                        className="text-slate-400 hover:text-rose-600 transition-colors p-1 rounded-md hover:bg-rose-50 cursor-pointer"
+                        title="Eliminar"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
 

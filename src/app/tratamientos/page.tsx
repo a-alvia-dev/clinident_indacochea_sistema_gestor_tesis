@@ -107,12 +107,26 @@ export default async function TratamientosPage() {
               }
             }
 
-            // CÁLCULOS DINÁMICOS DE PROGRESO
+            // CÁLCULOS DINÁMICOS DE PROGRESO Y COLORES
             const totalPiezas = piezasArray.length;
             const piezasTratadas = piezasArray.filter((pieza: any) => 
               typeof pieza === 'object' && pieza !== null && pieza.estado === 'tratada'
             ).length;
-            const porcentajeProgreso = totalPiezas > 0 ? (piezasTratadas / totalPiezas) * 100 : 0;
+
+            const porcentajeProgreso = totalPiezas > 0 ? Math.round((piezasTratadas / totalPiezas) * 100) : 0;
+
+            // Determinar colores según porcentaje de avance
+            const colorBarra = porcentajeProgreso === 100
+              ? 'bg-emerald-500'
+              : porcentajeProgreso >= 35
+              ? 'bg-amber-500'
+              : 'bg-rose-500';
+
+            const colorTexto = porcentajeProgreso === 100
+              ? 'text-emerald-600'
+              : porcentajeProgreso >= 35
+              ? 'text-amber-600'
+              : 'text-rose-600';
 
             return (
               <div
@@ -148,19 +162,19 @@ export default async function TratamientosPage() {
                   </p>
                 </div>
 
-                {/* BLOQUE DE PROGRESO DINÁMICO */}
+                {/* BLOQUE DE PROGRESO DINÁMICO DE COLORES */}
                 <div className="w-full md:w-64 space-y-2">
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-semibold text-slate-600">Progreso Tratamiento</span>
-                    <span className="font-bold text-teal-700">
+                    <span className={`font-bold ${colorTexto}`}>
                       {piezasTratadas} de {totalPiezas} curadas
                     </span>
                   </div>
 
-                  {/* BARRA CORREGIDA Y ANIMADA */}
+                  {/* BARRA DE PROGRESO MULTICOLOR */}
                   <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60">
                     <div
-                      className="h-full bg-teal-500 rounded-full transition-all duration-500"
+                      className={`h-full rounded-full transition-all duration-500 ${colorBarra}`}
                       style={{ width: `${porcentajeProgreso}%` }}
                     />
                   </div>
