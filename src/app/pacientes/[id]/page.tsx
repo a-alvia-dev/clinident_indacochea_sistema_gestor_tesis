@@ -8,26 +8,68 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
+interface PiezaRegistrada {
+  pieza: number;
+  hallazgo: string;
+  tratamiento: string;
+  nota: string;
+}
+
 export default function DetallePacientePage({ params }: PageProps) {
   const { id } = use(params);
 
+  // Carga de Paciente
   const [paciente, setPaciente] = useState<any>(null);
   const [cargando, setCargando] = useState(true);
   const [isPending, startTransition] = useTransition();
 
+  // 1. ANTECEDENTES SISTÉMICOS (ARRAY)
+  const [antecedentes, setAntecedentes] = useState<string[]>([]);
+  // 2. ALERGIAS (ARRAY)
+  const [alergias, setAlergias] = useState<string[]>([]);
+  // 3. HÁBITOS DE RIESGO (ARRAY)
+  const [habitos, setHabitos] = useState<string[]>([]);
+
+  // 4. OTROS DATOS MÉDICOS
+  const [presionArterial, setPresionArterial] = useState('');
+  const [fiebre, setFiebre] = useState('No');
+  const [otrosMeds, setOtrosMeds] = useState('');
+  const [observacionesMedicas, setObservacionesMedicas] = useState('');
+
+  // 5. MOTIVO Y SÍNTOMAS
+  const [motivoConsulta, setMotivoConsulta] = useState('Consulta Preventiva / Limpieza');
+  const [tipoDolor, setTipoDolor] = useState('Ninguno / Asintomático');
+  const [nivelDolor, setNivelDolor] = useState<number>(0);
+
+  // 6. ODONTOGRAMA DE PIEZAS
+  const [piezaSeleccionada, setPiezaSeleccionada] = useState<number | null>(null);
+  const [piezasClinicas, setPiezasClinicas] = useState<PiezaRegistrada[]>([]);
+  const [hallazgoTemp, setHallazgoTemp] = useState('Caries Profunda');
+  const [tratamientoTemp, setTratamientoTemp] = useState('Restauración / Resina');
+  const [notaTemp, setNotaTemp] = useState('');
+
+  // 7. RESULTADO FINAL TRIAJE
+  const [consultaFinalizada, setConsultaFinalizada] = useState(false);
   const [resultadoSemaforo, setResultadoSemaforo] = useState<{
     color: 'rojo' | 'naranja' | 'verde';
     razon: string;
   } | null>(null);
+
+  // Cuadrantes FDI (Adultos)
+  const cuadrante1 = [18, 17, 16, 15, 14, 13, 12, 11];
+  const cuadrante2 = [21, 22, 23, 24, 25, 26, 27, 28];
+  const cuadrante4 = [48, 47, 46, 45, 44, 43, 42, 41];
+  const cuadrante3 = [31, 32, 33, 34, 35, 36, 37, 38];
 
   useEffect(() => {
     async function cargar() {
       const data = await obtenerPacientePorId(id);
       setPaciente(data);
       if (data?.tiene_historia) {
+        setConsultaFinalizada(true);
         setResultadoSemaforo({
-          color: data.semaforo_color,
-          razon: data.semaforo_razon
+          color: data.semaforo_color || 'verde',
+          razon: data.semaforo_razon || 'Historia previa apertures guardada.'
         });
       }
       setCargando(false);
@@ -35,36 +77,120 @@ export default function DetallePacientePage({ params }: PageProps) {
     cargar();
   }, [id]);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  // Manejadores de Estado (Checkbox Garantizado)
+  const handleToggleAntecedente = (item: string) => {
+    setAntecedentes(prev =>
+      prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]
+    );
+  };
+
+  const handleToggleAlergia = (item: string) => {
+    setAlergias(prev =>
+      prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]
+    );
+  };
+
+  const handleToggleHabito = (item: string) => {
+    setHabitos(prev =>
+      prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]
+    );
+  };
+
+  // Guardar Pieza Dental
+  const agregarPiezaDental = () => {
+    if (!piezaSeleccionada) return;
+    const nuevaPieza: PiezaRegistrada = {
+      pieza: piezaSeleccionada,
+      hallazgo: hallazgoTemp,
+      tratamiento: tratamientoTemp,
+      nota: notaTemp
+    };
+    setPiezasClinicas(prev => [...prev.filter(p => p.pieza !== piezaSeleccionada), nuevaPieza]);
+    setPiezaSeleccionada(null);
+    setNotaTemp('');
+  };
+
+  const eliminarPieza = (numPieza: number) => {
+    setPiezasClinicas(prev => prev.filter(p => p.pieza !== numPieza));
+  };
+
+  // FINALIZAR Y EVALUAR ALGORITMO INTEGRADO
+  const handleFinalizarConsulta = (e: React.FormEvent) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
+
+    let colorCalculado: 'rojo' | 'naranja' | 'verde' = 'verde';
+    let razones: string[] = [];
+
+    // Evaluar estado del Odontograma
+    const tieneInfeccionGrave = piezasClinicas.some(p =>
+      p.hallazgo.includes('Infección') || p.hallazgo.includes('Absceso') || p.hallazgo.includes('Resto Radicular')
+    );
+    const tieneCariesOFrac = piezasClinicas.some(p =>
+      p.hallazgo.includes('Caries') || p.hallazgo.includes('Fractura')
+    );
+
+    // Evaluar Factores Sistémicos
+    const esCriticoSistemico = antecedentes.includes('Trastorno de Coagulación / Anticoagulado') || 
+                               antecedentes.includes('Cardiopatía / Soplo / Marcapasos') || 
+                               antecedentes.includes('Inmunocompromiso / Cáncer / Quimioterapia') ||
+                               fiebre === 'Sí';
+
+    if (nivelDolor >= 8) {
+      colorCalculado = 'rojo';
+      razones.push(`Dolor agudo extremo (EVA ${nivelDolor}/10)`);
+    }
+
+    if (tieneInfeccionGrave) {
+      colorCalculado = 'rojo';
+      razones.push('Presencia de proceso infeccioso / absceso / resto radicular activo');
+    }
+
+    if (esCriticoSistemico && (nivelDolor >= 4 || tieneCariesOFrac || tieneInfeccionGrave)) {
+      colorCalculado = 'rojo';
+      razones.push('Compromiso sistémico de alto riesgo (Anticoagulado / Cardiopatía / Cáncer / Fiebre)');
+    }
+
+    if (colorCalculado !== 'rojo') {
+      if (nivelDolor >= 4 || tieneCariesOFrac || antecedentes.includes('Diabetes Mellitus') || antecedentes.includes('Hipertensión Arterial')) {
+        colorCalculado = 'naranja';
+        if (nivelDolor >= 4) razones.push(`Dolor moderado (EVA ${nivelDolor}/10)`);
+        if (tieneCariesOFrac) razones.push('Lesiones dentales cavitadas (Caries / Fractura)');
+        if (antecedentes.includes('Diabetes Mellitus') || antecedentes.includes('Hipertensión Arterial')) {
+          razones.push('Enfermedad crónica de base requiere protocolo adaptado');
+        }
+      } else {
+        colorCalculado = 'verde';
+        razones.push('Paciente estable. Procedimiento estándar indicado sin criterios de urgencia');
+      }
+    }
+
+    const razonFinal = razones.join('. ') + '.';
+
+    const formData = new FormData();
     formData.append('pacienteId', id);
+    formData.append('motivo', motivoConsulta);
+    formData.append('nivel_dolor', nivelDolor.toString());
 
     startTransition(async () => {
-      const res = await aperturarHistoriaAction(formData);
-      if (res.success && res.color && res.razon) {
-        setResultadoSemaforo({
-          color: res.color,
-          razon: res.razon
-        });
-        setPaciente((prev: any) => ({ ...prev, tiene_historia: true }));
-      }
+      await aperturarHistoriaAction(formData);
+      setResultadoSemaforo({
+        color: colorCalculado,
+        razon: razonFinal
+      });
+      setConsultaFinalizada(true);
+      setPaciente((prev: any) => ({ ...prev, tiene_historia: true }));
     });
   };
 
   if (cargando) {
-    return (
-      <div className="max-w-4xl mx-auto p-12 text-center text-slate-400">
-        Cargando expediente del paciente...
-      </div>
-    );
+    return <div className="max-w-4xl mx-auto p-12 text-center text-slate-500 font-medium">Cargando expediente...</div>;
   }
 
   if (!paciente) {
     return (
-      <div className="max-w-4xl mx-auto p-12 text-center text-red-400">
+      <div className="max-w-4xl mx-auto p-12 text-center text-red-500 font-medium">
         Paciente no encontrado. <br />
-        <Link href="/pacientes" className="text-blue-400 underline mt-2 inline-block">
+        <Link href="/pacientes" className="text-[#0284c7] underline mt-2 inline-block">
           Volver a la lista
         </Link>
       </div>
@@ -72,259 +198,562 @@ export default function DetallePacientePage({ params }: PageProps) {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6 pb-20">
       
-      {/* Encabezado */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+      {/* ENCABEZADO */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex justify-between items-center">
         <div>
-          <Link href="/pacientes" className="text-slate-400 hover:text-slate-200 text-sm transition-colors">
+          <Link href="/pacientes" className="text-xs font-bold text-slate-500 hover:text-[#2B5566] transition-colors mb-1 inline-block">
             ← Volver a Pacientes
           </Link>
-          <h1 className="text-2xl font-bold text-slate-100 mt-1">
-            {paciente.nombres} {paciente.apellidos}
-          </h1>
-          <p className="text-slate-400 text-sm">
-            Cédula: <span className="text-slate-200 font-medium">{paciente.cedula || 'Sin Cédula'}</span> | 
-            Teléfono: <span className="text-slate-200 font-medium">{paciente.telefono || 'Sin Teléfono'}</span>
+          <h1 className="text-2xl font-extrabold text-[#0d1527]">{paciente.nombres} {paciente.apellidos}</h1>
+          <p className="text-slate-600 text-xs font-medium mt-1">
+            Cédula: <span className="text-slate-900 font-bold">{paciente.cedula || 'N/A'}</span> &nbsp;|&nbsp; 
+            Teléfono: <span className="text-slate-900 font-bold">{paciente.telefono || 'N/A'}</span>
           </p>
         </div>
 
-        {paciente.tiene_historia && resultadoSemaforo && (
-          <div className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider text-center border ${
+        {consultaFinalizada && resultadoSemaforo && (
+          <div className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider text-center border shadow-xs ${
             resultadoSemaforo.color === 'rojo' 
-              ? 'bg-red-500/20 text-red-400 border-red-500/30'
+              ? 'bg-red-100 text-red-800 border-red-300'
               : resultadoSemaforo.color === 'naranja'
-              ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-              : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+              ? 'bg-amber-100 text-amber-800 border-amber-300'
+              : 'bg-emerald-100 text-emerald-800 border-emerald-300'
           }`}>
-            Semaforización: {resultadoSemaforo.color}
+            Prioridad: {resultadoSemaforo.color}
           </div>
         )}
       </div>
 
-      {/* PANEL DE RESULTADO DEL SEMÁFORO AUTOMATIZADO */}
-      {resultadoSemaforo && (
-        <div className={`p-6 rounded-2xl border shadow-xl transition-all ${
+      {/* RESULTADO FINAL TRIAJE */}
+      {consultaFinalizada && resultadoSemaforo && (
+        <div className={`p-6 rounded-2xl border shadow-md transition-all ${
           resultadoSemaforo.color === 'rojo'
-            ? 'bg-red-950/40 border-red-500/50 text-red-200'
+            ? 'bg-red-50 border-red-300 text-red-950'
             : resultadoSemaforo.color === 'naranja'
-            ? 'bg-amber-950/40 border-amber-500/50 text-amber-200'
-            : 'bg-emerald-950/40 border-emerald-500/50 text-emerald-200'
+            ? 'bg-amber-50 border-amber-300 text-amber-950'
+            : 'bg-emerald-50 border-emerald-300 text-emerald-950'
         }`}>
-          <div className="flex items-center gap-3 mb-2">
-            <span className="text-3xl">
+          <div className="flex items-start gap-4">
+            <span className="text-4xl">
               {resultadoSemaforo.color === 'rojo' ? '🔴' : resultadoSemaforo.color === 'naranja' ? '🟠' : '🟢'}
             </span>
-            <div>
-              <h2 className="text-lg font-bold">
-                Prioridad de Atención: {resultadoSemaforo.color.toUpperCase()}
+            <div className="space-y-1">
+              <h2 className="text-xl font-extrabold uppercase tracking-wide">
+                Prioridad de Atención: {resultadoSemaforo.color}
               </h2>
-              <p className="text-xs opacity-80">Calculado automáticamente por el Sistema de Triaje Clínico</p>
+              <p className="text-xs font-semibold leading-relaxed opacity-90">
+                {resultadoSemaforo.razon}
+              </p>
             </div>
           </div>
-          <p className="text-sm mt-3 bg-black/20 p-3 rounded-xl border border-white/5">
-            <strong>Evaluación del Algoritmo:</strong> {resultadoSemaforo.razon}
-          </p>
         </div>
       )}
 
-      {/* FORMULARIO DE APERTURA DE HISTORIA CLÍNICA */}
-      {!paciente.tiene_historia ? (
-        <form onSubmit={handleSubmit} className="bg-slate-800 p-6 md:p-8 rounded-2xl border border-slate-700 shadow-xl space-y-6">
-          <div className="border-b border-slate-700 pb-3">
-            <h2 className="text-lg font-semibold text-slate-100">Apertura de Historia Clínica y Triaje Inicial</h2>
-            <p className="text-slate-400 text-xs mt-1">
-              Seleccione los parámetros observados. El algoritmo calculará la semaforización de forma automática al guardar.
-            </p>
-          </div>
-
-          {/* 1. ANAMNESIS Y ANTECEDENTES MÉDICOS */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-blue-400 uppercase tracking-wider">1. Antecedentes Médicos y Alergias</h3>
-            
-            {/* Enfermedades Preexistentes */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Enfermedades Preexistentes / Sistémicas</label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 text-xs text-slate-300">
-                {['Hipertensión Arterial', 'Diabetes Mellitus', 'Cardiopatía', 'Trastornos de Coagulación', 'Asma / Resp.', 'Ninguna'].map((enf) => (
-                  <label key={enf} className="flex items-center gap-2 p-2.5 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer hover:bg-slate-700/50">
-                    <input type="checkbox" name="enfermedades_sistemicas" value={enf} className="rounded" />
-                    <span>{enf}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Combobox de Alergias */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Alergias Conocidas</label>
-                <select
-                  name="alergias_tipo"
-                  className="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-blue-500 text-sm"
-                >
-                  <option value="ninguna">Ninguna alergia reportada</option>
-                  <option value="Penicilina / Antibióticos">Penicilina / Antibióticos</option>
-                  <option value="Anestésicos Locales">Anestésicos Locales</option>
-                  <option value="AINEs (Ibuprofeno/Aspirina)">AINEs (Ibuprofeno/Aspirina)</option>
-                  <option value="Látex">Látex</option>
-                  <option value="Otra Alergia">Otra Alergia Especifica</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Detalle de Alergia / Medicamentos Activos</label>
-                <input
-                  type="text"
-                  name="alergias_detalle"
-                  placeholder="Ej. Reacción alérgica severa, consume anticoagulantes..."
-                  className="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-blue-500 text-sm"
-                />
-              </div>
-            </div>
-          </div>
-
-          <hr className="border-slate-700/80" />
-
-          {/* 2. EXAMEN CLÍNICO Y SÍNTOMAS */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-blue-400 uppercase tracking-wider">2. Examen Clínico Inicial y Sintomatología</h3>
-            
-            {/* Combobox Motivo de Consulta */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Motivo Principal de Consulta *</label>
-                <select
-                  name="motivo_consulta"
-                  required
-                  className="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-blue-500 text-sm"
-                >
-                  <option value="Limpieza / Control Preventivo">Limpieza / Control Preventivo</option>
-                  <option value="Dolor Dental Agudo">Dolor Dental Agudo</option>
-                  <option value="Inflamación o Sangrado de Encías">Inflamación o Sangrado de Encías</option>
-                  <option value="Diente Fracturado / Traumatismo">Diente Fracturado / Traumatismo</option>
-                  <option value="Sensibilidad Dental">Sensibilidad Dental</option>
-                  <option value="Cambio de Restauración / Calza">Cambio de Restauración / Calza</option>
-                  <option value="Estética / Ortodoncia">Estética / Ortodoncia</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Detalle Adicional del Motivo</label>
-                <input
-                  type="text"
-                  name="motivo_detalle"
-                  placeholder="Ej. Paciente refiere dolor al masticar desde hace 2 días"
-                  className="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-blue-500 text-sm"
-                />
-              </div>
-            </div>
-
-            {/* Radio Buttons Nivel de Dolor */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Nivel de Dolor / Sintomatología *</label>
-              <div className="grid grid-cols-3 gap-3">
-                <label className="flex items-center gap-2 p-3 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer text-sm text-slate-200">
-                  <input type="radio" name="nivel_dolor" value="ninguno" defaultChecked />
-                  <span>🟢 Sin Dolor</span>
-                </label>
-                <label className="flex items-center gap-2 p-3 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer text-sm text-amber-400">
-                  <input type="radio" name="nivel_dolor" value="leve" />
-                  <span>🟠 Dolor Leve / Molestia</span>
-                </label>
-                <label className="flex items-center gap-2 p-3 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer text-sm text-red-400 font-medium">
-                  <input type="radio" name="nivel_dolor" value="severo" />
-                  <span>🔴 Dolor Severo / Agudo</span>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <hr className="border-slate-700/80" />
-
-          {/* 3. HALLAZGOS BUCALES Y DENTALES */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-blue-400 uppercase tracking-wider">3. Hallazgos Bucales y Diagnóstico Físico</h3>
-
-            {/* Combobox Estado Encías */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Estado de Tejidos Blandos / Encías</label>
-              <select
-                name="estado_encias"
-                className="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-blue-500 text-sm"
-              >
-                <option value="sanas">Encías Sanas</option>
-                <option value="gingivitis">Gingivitis (Inflamación / Sangrado Leve)</option>
-                <option value="periodontitis">Periodontitis (Sangrado Severo / Movilidad)</option>
-              </select>
-            </div>
-
-            {/* Checkboxes Hallazgos Bucales */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Hallazgos Dentales Observados</label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs text-slate-300">
-                <label className="flex items-center gap-2 p-2.5 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer hover:bg-slate-700/50">
-                  <input type="checkbox" name="hallazgos_bucales" value="infeccion_absceso" className="rounded text-red-500" />
-                  <span className="text-red-400 font-medium">Infección Activa / Absceso / Pus (🔴 Critico)</span>
-                </label>
-                <label className="flex items-center gap-2 p-2.5 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer hover:bg-slate-700/50">
-                  <input type="checkbox" name="hallazgos_bucales" value="trauma_fractura" className="rounded text-red-500" />
-                  <span className="text-red-400 font-medium">Trauma / Fractura Expuesta (🔴 Critico)</span>
-                </label>
-                <label className="flex items-center gap-2 p-2.5 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer hover:bg-slate-700/50">
-                  <input type="checkbox" name="hallazgos_bucales" value="movilidad_severa" className="rounded text-red-500" />
-                  <span className="text-red-400 font-medium">Movilidad Dental Severa (🔴 Critico)</span>
-                </label>
-                <label className="flex items-center gap-2 p-2.5 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer hover:bg-slate-700/50">
-                  <input type="checkbox" name="hallazgos_bucales" value="caries_profunda" className="rounded" />
-                  <span>Caries Profunda</span>
-                </label>
-                <label className="flex items-center gap-2 p-2.5 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer hover:bg-slate-700/50">
-                  <input type="checkbox" name="hallazgos_bucales" value="protesis_desajustada" className="rounded" />
-                  <span>Prótesis / Restauración Desajustada</span>
-                </label>
-                <label className="flex items-center gap-2 p-2.5 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer hover:bg-slate-700/50">
-                  <input type="checkbox" name="hallazgos_bucales" value="dientes_sanos" className="rounded" />
-                  <span>Dientes Sanos / Sin Caries Visibles</span>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          {/* Botón de Enviar */}
-          <div className="pt-4 border-t border-slate-700 flex justify-end">
-            <button
-              type="submit"
-              disabled={isPending}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-blue-900/30 text-sm disabled:opacity-50"
-            >
-              {isPending ? 'Evaluando Triaje...' : 'Guardar y Calcular Semáforo'}
-            </button>
-          </div>
-        </form>
-      ) : (
-        /* VISTA DE RESUMEN DE HISTORIA CLÍNICA */
-        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 space-y-4">
-          <h2 className="text-lg font-semibold text-slate-100 border-b border-slate-700 pb-2">
-            Resumen de Historia Clínica Aperturada
+      {/* SI YA ESTÁ FINALIZADO */}
+      {consultaFinalizada ? (
+        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b pb-2">
+            Resumen Clínico Registrado
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div>
-              <p className="text-xs text-slate-400">Motivo de Consulta:</p>
-              <p className="text-slate-200 font-medium">{paciente.motivo_consulta}</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <span className="text-slate-400 font-medium block mb-1">Motivo:</span>
+              <span className="font-bold text-slate-900">{motivoConsulta}</span>
             </div>
-            <div>
-              <p className="text-xs text-slate-400">Nivel de Dolor:</p>
-              <p className="text-slate-200 font-medium capitalize">{paciente.nivel_dolor}</p>
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <span className="text-slate-400 font-medium block mb-1">Dolor Registrado:</span>
+              <span className="font-bold text-slate-900">EVA {nivelDolor}/10 ({tipoDolor})</span>
             </div>
-            <div>
-              <p className="text-xs text-slate-400">Alergias:</p>
-              <p className="text-slate-200 font-medium">{paciente.alergias_tipo || 'Ninguna'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-400">Estado Encías:</p>
-              <p className="text-slate-200 font-medium capitalize">{paciente.estado_encias || 'No evaluado'}</p>
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <span className="text-slate-400 font-medium block mb-1">Piezas Halladas:</span>
+              <span className="font-bold text-[#0284c7]">{piezasClinicas.length} Pieza(s) registradas</span>
             </div>
           </div>
         </div>
+      ) : (
+        /* FORMULARIO COMPLETO DE TRIAJE Y ODONTOGRAMA */
+        <form onSubmit={handleFinalizarConsulta} className="space-y-6">
+          
+          {/* APARTADO 1: ANAMNESIS DENTOMÉDICA EXTENSA */}
+          <div className="bg-white p-8 rounded-2xl border border-slate-200/80 shadow-sm space-y-8">
+            <div>
+              <h2 className="text-xl font-bold text-[#0d1527]">1. Triaje e Historia Clínica Médica Completa</h2>
+              <p className="text-slate-500 text-xs font-medium mt-1">
+                Marque los antecedentes, alergias, hábitos y signos vitales reportados por el paciente.
+              </p>
+            </div>
+
+            {/* A. Antecedentes Médicos Sistémicos (REDUCIDOS A 8 OPCIONES CLAVE) */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">
+                A. Antecedentes Médicos Sistémicos
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs font-medium">
+                {[
+                  'Hipertensión Arterial', 
+                  'Diabetes Mellitus', 
+                  'Cardiopatía / Soplo / Marcapasos',
+                  'Trastorno de Coagulación / Anticoagulado', 
+                  'Asma / EPOC / Resp. Crónica',
+                  'Embarazo / Lactancia', 
+                  'Osteoporosis / Uso de Bifosfonatos',
+                  'Inmunocompromiso / Cáncer / Quimioterapia'
+                ].map(item => {
+                  const checked = antecedentes.includes(item);
+                  return (
+                    <label 
+                      key={item} 
+                      className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                        checked 
+                          ? 'bg-slate-900 text-white border-slate-900 font-bold shadow-xs' 
+                          : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      <input 
+                        type="checkbox" 
+                        checked={checked} 
+                        onChange={() => handleToggleAntecedente(item)}
+                        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-0 cursor-pointer" 
+                      />
+                      <span className="leading-tight">{item}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* B. Alergias Conocidas */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">
+                B. Alergias Conocidas
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs font-medium">
+                {[
+                  'Penicilina / Amoxicilina / Antibióticos', 'Anestésicos Locales (Lidocaína, Mepivacaína)',
+                  'AINEs (Ibuprofeno, Aspirina, Ketorolaco)', 'Látex / Guantes',
+                  'Resinas / Acrílicos / Metales Dentales', 'Yodo / Antisépticos', 'Ninguna Conocida'
+                ].map(alergia => {
+                  const checked = alergias.includes(alergia);
+                  return (
+                    <label 
+                      key={alergia} 
+                      className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                        checked 
+                          ? 'bg-red-900 text-white border-red-900 font-bold shadow-xs' 
+                          : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      <input 
+                        type="checkbox" 
+                        checked={checked} 
+                        onChange={() => handleToggleAlergia(alergia)}
+                        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-0 cursor-pointer" 
+                      />
+                      <span className="leading-tight">{alergia}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* C. Hábitos de Riesgo y Estilo de Vida */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">
+                C. Hábitos y Estilo de Vida
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-medium">
+                {[
+                  'Bruxismo / Rechinamiento', 'Tabaquismo / Fumador',
+                  'Consumo Frecuente de Alcohol', 'Mala Higiene Bucal'
+                ].map(habito => {
+                  const checked = habitos.includes(habito);
+                  return (
+                    <label 
+                      key={habito} 
+                      className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                        checked 
+                          ? 'bg-amber-900 text-white border-amber-900 font-bold shadow-xs' 
+                          : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      <input 
+                        type="checkbox" 
+                        checked={checked} 
+                        onChange={() => handleToggleHabito(habito)}
+                        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-0 cursor-pointer" 
+                      />
+                      <span className="leading-tight">{habito}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* D. Signos Vitales y Medicamentos */}
+            <div className="space-y-4 pt-2 border-t border-slate-100">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                D. Signos Vitales Básicos y Tratamiento Farmacológico
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Presión Arterial (mmHg)</label>
+                  <input 
+                    type="text" 
+                    value={presionArterial}
+                    onChange={(e) => setPresionArterial(e.target.value)}
+                    placeholder="Ej. 120/80" 
+                    className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-[#2B5566]" 
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">¿Manifiesta Fiebre o Escalofríos?</label>
+                  <select 
+                    value={fiebre}
+                    onChange={(e) => setFiebre(e.target.value)}
+                    className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-[#2B5566]"
+                  >
+                    <option value="No">No / Afebril</option>
+                    <option value="Sí">Sí / Sensación febril o medición &gt; 37.8°C</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Medicamentos de Uso Continuo</label>
+                  <input 
+                    type="text" 
+                    value={otrosMeds}
+                    onChange={(e) => setOtrosMeds(e.target.value)}
+                    placeholder="Losartán, Metformina, Warfarina..." 
+                    className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-[#2B5566]" 
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* E. Motivo de Consulta y Evaluación del Dolor */}
+            <div className="space-y-4 pt-2 border-t border-slate-100">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                E. Motivo de Consulta y Evaluación Sintomática
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Motivo Principal de Atención</label>
+                  <select 
+                    value={motivoConsulta}
+                    onChange={(e) => setMotivoConsulta(e.target.value)}
+                    className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs font-medium text-[#0d1527] focus:bg-white focus:outline-none focus:border-[#2B5566]"
+                  >
+                    <option value="Consulta Preventiva / Limpieza">Consulta Preventiva / Limpieza</option>
+                    <option value="Dolor Dental Agudo">Dolor Dental Agudo</option>
+                    <option value="Inflamación / Absceso / Supuración">Inflamación / Absceso / Supuración (Pus)</option>
+                    <option value="Traumatismo / Diente Fracturado">Traumatismo / Diente Fracturado o Suelto</option>
+                    <option value="Estética / Diseño / Ortodoncia">Estética / Diseño / Ortodoncia</option>
+                    <option value="Rehabilitación / Prótesis / Implante">Rehabilitación / Prótesis / Implante</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Caracterización del Dolor</label>
+                  <select 
+                    value={tipoDolor}
+                    onChange={(e) => setTipoDolor(e.target.value)}
+                    className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs font-medium text-[#0d1527] focus:bg-white focus:outline-none focus:border-[#2B5566]"
+                  >
+                    <option value="Ninguno / Asintomático">Ninguno / Asintomático</option>
+                    <option value="Pulsátil / Latido constante">Pulsátil / Latido constante (Intenso noche)</option>
+                    <option value="Punzante / Agudo al masticar">Punzante / Agudo al masticar</option>
+                    <option value="Provocado por Frío / Calor">Provocado por Frío / Calor</option>
+                    <option value="Sordo / Molestia continua">Sordo / Molestia continua</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* SELECCIÓN EVA CON MARCADO CLARO */}
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-xs font-bold text-slate-700">
+                    Nivel de Dolor Escala EVA (0 al 10)
+                  </label>
+                  <span className="text-xs font-extrabold text-[#2B5566] bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">
+                    Registrado: EVA {nivelDolor}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-11 gap-1.5">
+                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => {
+                    const isSelected = nivelDolor === num;
+                    return (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setNivelDolor(num)}
+                        className={`py-3 rounded-xl text-xs font-extrabold border transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-slate-900 text-white border-slate-900 shadow-md scale-105 ring-2 ring-slate-400'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-200'
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* APARTADO 2: ODONTOGRAMA Y REGISTRO DE PIEZAS */}
+          <div className="bg-white p-6 md:p-8 rounded-2xl border border-slate-200/80 shadow-sm space-y-6">
+            <div>
+              <h2 className="text-lg font-bold text-[#0d1527]">2. Examen Dental por Piezas (Nomenclatura FDI)</h2>
+              <p className="text-slate-500 text-xs font-medium mt-0.5">
+                Haga clic sobre cada pieza en la boca del paciente para asignarle su estado o tratamiento.
+              </p>
+            </div>
+
+            {/* DIAGRAMA DE PIEZAS */}
+            <div className="space-y-4 bg-slate-50/70 p-4 rounded-2xl border border-slate-200/70">
+              
+              {/* Maxilar Superior */}
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block text-center mb-2">
+                  Maxilar Superior
+                </span>
+                <div className="flex justify-center gap-1 sm:gap-2">
+                  <div className="flex gap-1">
+                    {cuadrante1.map(pieza => {
+                      const tieneReg = piezasClinicas.some(p => p.pieza === pieza);
+                      return (
+                        <button
+                          key={pieza}
+                          type="button"
+                          onClick={() => setPiezaSeleccionada(pieza)}
+                          className={`w-8 h-10 sm:w-10 sm:h-12 rounded-xl border text-xs font-extrabold transition-all cursor-pointer ${
+                            piezaSeleccionada === pieza
+                              ? 'bg-[#2B5566] text-white border-[#2B5566] scale-110 shadow-md ring-2 ring-blue-300'
+                              : tieneReg
+                              ? 'bg-amber-100 border-amber-400 text-amber-950 font-black ring-1 ring-amber-300'
+                              : 'bg-white border-slate-200 text-slate-700 hover:border-slate-400'
+                          }`}
+                        >
+                          {pieza}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="w-0.5 bg-slate-300 rounded-full h-10 sm:h-12 mx-1"></div>
+                  <div className="flex gap-1">
+                    {cuadrante2.map(pieza => {
+                      const tieneReg = piezasClinicas.some(p => p.pieza === pieza);
+                      return (
+                        <button
+                          key={pieza}
+                          type="button"
+                          onClick={() => setPiezaSeleccionada(pieza)}
+                          className={`w-8 h-10 sm:w-10 sm:h-12 rounded-xl border text-xs font-extrabold transition-all cursor-pointer ${
+                            piezaSeleccionada === pieza
+                              ? 'bg-[#2B5566] text-white border-[#2B5566] scale-110 shadow-md ring-2 ring-blue-300'
+                              : tieneReg
+                              ? 'bg-amber-100 border-amber-400 text-amber-950 font-black ring-1 ring-amber-300'
+                              : 'bg-white border-slate-200 text-slate-700 hover:border-slate-400'
+                          }`}
+                        >
+                          {pieza}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <hr className="border-slate-200" />
+
+              {/* Maxilar Inferior */}
+              <div>
+                <div className="flex justify-center gap-1 sm:gap-2">
+                  <div className="flex gap-1">
+                    {cuadrante4.map(pieza => {
+                      const tieneReg = piezasClinicas.some(p => p.pieza === pieza);
+                      return (
+                        <button
+                          key={pieza}
+                          type="button"
+                          onClick={() => setPiezaSeleccionada(pieza)}
+                          className={`w-8 h-10 sm:w-10 sm:h-12 rounded-xl border text-xs font-extrabold transition-all cursor-pointer ${
+                            piezaSeleccionada === pieza
+                              ? 'bg-[#2B5566] text-white border-[#2B5566] scale-110 shadow-md ring-2 ring-blue-300'
+                              : tieneReg
+                              ? 'bg-amber-100 border-amber-400 text-amber-950 font-black ring-1 ring-amber-300'
+                              : 'bg-white border-slate-200 text-slate-700 hover:border-slate-400'
+                          }`}
+                        >
+                          {pieza}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="w-0.5 bg-slate-300 rounded-full h-10 sm:h-12 mx-1"></div>
+                  <div className="flex gap-1">
+                    {cuadrante3.map(pieza => {
+                      const tieneReg = piezasClinicas.some(p => p.pieza === pieza);
+                      return (
+                        <button
+                          key={pieza}
+                          type="button"
+                          onClick={() => setPiezaSeleccionada(pieza)}
+                          className={`w-8 h-10 sm:w-10 sm:h-12 rounded-xl border text-xs font-extrabold transition-all cursor-pointer ${
+                            piezaSeleccionada === pieza
+                              ? 'bg-[#2B5566] text-white border-[#2B5566] scale-110 shadow-md ring-2 ring-blue-300'
+                              : tieneReg
+                              ? 'bg-amber-100 border-amber-400 text-amber-950 font-black ring-1 ring-amber-300'
+                              : 'bg-white border-slate-200 text-slate-700 hover:border-slate-400'
+                          }`}
+                        >
+                          {pieza}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block text-center mt-2">
+                  Maxilar Inferior
+                </span>
+              </div>
+
+            </div>
+
+            {/* PANEL DE REGISTRO DE PIEZA */}
+            {piezaSeleccionada && (
+              <div className="p-5 bg-slate-100 rounded-2xl border border-slate-300 space-y-4 animate-in fade-in duration-150">
+                <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                  <h3 className="text-sm font-extrabold text-[#0d1527]">
+                    Anotación para Pieza Dental #{piezaSeleccionada}
+                  </h3>
+                  <button 
+                    type="button"
+                    onClick={() => setPiezaSeleccionada(null)}
+                    className="text-xs font-bold text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    ✕ Cancelar
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Hallazgo Observado</label>
+                    <select 
+                      value={hallazgoTemp} 
+                      onChange={(e) => setHallazgoTemp(e.target.value)}
+                      className="w-full p-2.5 bg-white rounded-xl border border-slate-300 font-medium text-slate-900"
+                    >
+                      <option value="Caries Profunda">Caries Profunda</option>
+                      <option value="Infección / Absceso / Supuración">Infección / Absceso / Supuración</option>
+                      <option value="Resto Radicular Infectado">Resto Radicular Infectado</option>
+                      <option value="Fractura Dental / Traumatismo">Fractura Dental / Traumatismo</option>
+                      <option value="Pieza Ausente">Pieza Ausente</option>
+                      <option value="Tratamiento Conducto Previo">Tratamiento Conducto Previo</option>
+                      <option value="Diente Sano / Control">Diente Sano / Control</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Tratamiento Sugerido</label>
+                    <select 
+                      value={tratamientoTemp} 
+                      onChange={(e) => setTratamientoTemp(e.target.value)}
+                      className="w-full p-2.5 bg-white rounded-xl border border-slate-300 font-medium text-slate-900"
+                    >
+                      <option value="Restauración / Resina">Restauración / Resina</option>
+                      <option value="Endodoncia (Tratamiento Conducto)">Endodoncia (Tratamiento Conducto)</option>
+                      <option value="Exodoncia (Extracción)">Exodoncia (Extracción)</option>
+                      <option value="Corona / Prótesis">Corona / Prótesis</option>
+                      <option value="Limpieza Profunda / Detartraje">Limpieza Profunda / Detartraje</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Notas Clínicas</label>
+                  <input 
+                    type="text" 
+                    value={notaTemp}
+                    onChange={(e) => setNotaTemp(e.target.value)}
+                    placeholder="Ej. Movilidad grado 1, cavidad vestibular..."
+                    className="w-full p-2.5 bg-white rounded-xl border border-slate-300 text-xs text-slate-900"
+                  />
+                </div>
+
+                <div className="flex justify-end">
+                  <button 
+                    type="button"
+                    onClick={agregarPiezaDental}
+                    className="px-5 py-2.5 bg-[#2B5566] text-white text-xs font-bold rounded-xl hover:bg-[#1f3e4b] transition-colors shadow-sm cursor-pointer"
+                  >
+                    Guardar Pieza #{piezaSeleccionada}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* TABLA RESUMEN DE PIEZAS */}
+            {piezasClinicas.length > 0 && (
+              <div className="space-y-3 pt-2">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                  Piezas Dentales Registradas ({piezasClinicas.length})
+                </h3>
+                <div className="overflow-x-auto border rounded-xl">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                      <tr>
+                        <th className="py-2.5 px-3">Pieza</th>
+                        <th className="py-2.5 px-3">Hallazgo</th>
+                        <th className="py-2.5 px-3">Tratamiento Propuesto</th>
+                        <th className="py-2.5 px-3">Notas</th>
+                        <th className="py-2.5 px-3 text-right">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
+                      {piezasClinicas.map((p) => (
+                        <tr key={p.pieza} className="hover:bg-slate-50">
+                          <td className="py-2.5 px-3 font-extrabold text-[#0284c7]">#{p.pieza}</td>
+                          <td className="py-2.5 px-3">{p.hallazgo}</td>
+                          <td className="py-2.5 px-3 font-semibold text-slate-900">{p.tratamiento}</td>
+                          <td className="py-2.5 px-3 text-slate-500">{p.nota || '-'}</td>
+                          <td className="py-2.5 px-3 text-right">
+                            <button 
+                              type="button"
+                              onClick={() => eliminarPieza(p.pieza)}
+                              className="text-red-500 font-bold hover:underline cursor-pointer"
+                            >
+                              Eliminar
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+          </div>
+
+          {/* BOTÓN FINAL DE CIERRE */}
+          <button 
+            type="submit" 
+            disabled={isPending}
+            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-extrabold text-base hover:bg-slate-800 transition-all shadow-md cursor-pointer"
+          >
+            {isPending ? 'Analizando expediente clínico...' : 'Finalizar Consulta y Calcular Semáforo'}
+          </button>
+
+        </form>
       )}
 
     </div>

@@ -14,52 +14,61 @@ export default async function PacientesPage({ searchParams }: PageProps) {
     <div className="max-w-6xl mx-auto space-y-6">
       
       {/* Encabezado */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-300/60 pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100">Gestión de Pacientes</h1>
-          <p className="text-slate-400 text-sm mt-0.5">
+          <h1 className="text-3xl font-extrabold text-[#0d1527] tracking-tight">
+            Gestión de Pacientes
+          </h1>
+          <p className="text-slate-600 text-sm font-medium mt-1">
             Administra los datos personales, historias clínicas y el semáforo de triaje.
           </p>
         </div>
+        
+        {/* BOTÓN "NUEVO PACIENTE" CON AZUL PETRÓLEO CORPORATIVO (#2B5566) */}
         <Link
           href="/pacientes/nuevo"
-          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 font-medium text-white text-sm rounded-xl transition-colors shadow-lg shadow-blue-900/20 text-center"
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#2B5566] hover:bg-[#1f3e4b] font-bold text-white text-sm rounded-xl transition-all shadow-sm hover:shadow-md"
         >
-          + Nuevo Paciente
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+          </svg>
+          Nuevo Paciente
         </Link>
       </div>
 
-      {/* Buscador */}
+      {/* Buscador Blanco Limpio */}
       <form method="GET" className="max-w-md">
-        <input
-          type="text"
-          name="busqueda"
-          defaultValue={busqueda || ''}
-          placeholder="Buscar por nombre, apellido o cédula..."
-          className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
-        />
+        <div className="relative">
+          <input
+            type="text"
+            name="busqueda"
+            defaultValue={busqueda || ''}
+            placeholder="Buscar por nombre, apellido o cédula..."
+            className="w-full px-4 py-2.5 bg-white border border-slate-300/80 rounded-xl text-[#0d1527] placeholder-slate-400 focus:outline-none focus:border-[#2B5566] focus:ring-1 focus:ring-[#2B5566] text-sm shadow-sm transition-all font-medium"
+          />
+        </div>
       </form>
 
-      {/* Tabla de Pacientes */}
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden shadow-xl">
+      {/* Tabla de Pacientes en Blanco con Cabecera Oscura */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-md">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-slate-700 bg-slate-900/50 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            <tr className="bg-[#0d1527] text-white text-xs font-bold uppercase tracking-wider">
               <th className="p-4">Paciente</th>
               <th className="p-4">Cédula</th>
               <th className="p-4">Estado / Semáforo</th>
-              <th className="p-4 text-right">Acciones</th>
+              <th className="p-4 text-right">Acción</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-700/60 text-sm">
+          <tbody className="divide-y divide-slate-100 text-sm font-medium text-slate-800">
             {pacientes && pacientes.length > 0 ? (
               pacientes.map((paciente: any) => (
                 <FilaPaciente key={paciente.id} paciente={paciente} />
               ))
             ) : (
               <tr>
-                <td colSpan={4} className="p-8 text-center text-slate-400 text-sm italic">
-                  No se encontraron pacientes registrados.
+                <td colSpan={4} className="p-10 text-center text-slate-500 text-sm font-medium italic">
+                  No hay pacientes registrados aún.
                 </td>
               </tr>
             )}

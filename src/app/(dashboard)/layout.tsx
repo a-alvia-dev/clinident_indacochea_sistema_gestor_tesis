@@ -6,14 +6,14 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-900">
+    <div className="flex h-screen overflow-hidden bg-[#eef2f6]">
       
       {/* Sidebar Fijo solo para el Panel del Sistema */}
-      <aside className="w-64 bg-slate-950 border-r border-slate-800 flex flex-col justify-between shrink-0 hidden md:flex">
+      <aside className="w-64 bg-[#0d1527] border-r border-slate-800 flex flex-col justify-between shrink-0 hidden md:flex">
         <div className="p-6 space-y-8">
           {/* Logo e Identidad */}
           <div>
-            <h1 className="text-xl font-bold text-blue-500 tracking-wide">Clinident</h1>
+            <h1 className="text-xl font-bold text-white tracking-wide">Clinident</h1>
             <p className="text-xs text-slate-400 mt-0.5">Gestión Odontológica</p>
           </div>
 

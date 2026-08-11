@@ -22,23 +22,26 @@ export function BotonEliminar({ id, nombre }: { id: string; nombre: string }) {
   // Si el usuario hace clic en el tacho, mostramos la confirmación integradita
   if (confirmando) {
     return (
-      <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 p-1.5 rounded-xl">
-        <span className="text-[11px] text-red-300 font-medium pl-1">
+      <div className="flex items-center gap-2 bg-red-50 border border-red-200 p-1.5 rounded-xl shadow-sm">
+        {/* TEXTO AJUSTADO A RED-700 FONT-BOLD PARA ALTO CONTRASTE */}
+        <span className="text-xs text-red-700 font-bold pl-1">
           ¿Eliminar a {nombre.split(' ')[0]}?
         </span>
+        
         <button
           type="button"
           onClick={handleEliminar}
           disabled={isPending}
-          className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded-lg text-[11px] font-bold transition-colors disabled:opacity-50"
+          className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50 shadow-sm"
         >
           {isPending ? 'Borrando...' : 'Sí, eliminar'}
         </button>
+        
         <button
           type="button"
           onClick={() => setConfirmando(false)}
           disabled={isPending}
-          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px] transition-colors"
+          className="px-2.5 py-1 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-colors"
         >
           Cancelar
         </button>
@@ -53,7 +56,7 @@ export function BotonEliminar({ id, nombre }: { id: string; nombre: string }) {
         type="button"
         onClick={() => setConfirmando(true)}
         title="Eliminar paciente"
-        className="p-2 text-xs font-medium text-rose-400 hover:text-white bg-rose-500/10 hover:bg-rose-600 border border-rose-500/20 rounded-xl transition-colors flex items-center justify-center"
+        className="p-2 text-xs font-medium text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 hover:border-rose-600 rounded-xl transition-all flex items-center justify-center shadow-sm"
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -66,7 +69,7 @@ export function BotonEliminar({ id, nombre }: { id: string; nombre: string }) {
       </button>
 
       {errorMsg && (
-        <span className="text-[11px] text-red-400 font-medium animate-pulse">
+        <span className="text-[11px] text-red-600 font-bold animate-pulse">
           ⚠️ {errorMsg}
         </span>
       )}

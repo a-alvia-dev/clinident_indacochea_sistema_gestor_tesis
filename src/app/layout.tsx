@@ -16,14 +16,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es" className="dark">
-      <body className={`${inter.className} bg-slate-900 text-slate-100 flex h-screen overflow-hidden antialiased`}>
+    <html lang="es">
+      <body className={`${inter.className} bg-clinident-niebla text-slate-800 flex h-screen overflow-hidden antialiased`}>
         
         {/* Sidebar Fijo Completo */}
         <Sidebar />
 
         {/* Área Principal del Sistema */}
-        <main className="flex-1 bg-slate-900 overflow-y-auto h-screen p-6 md:p-10">
+        <main className="flex-1 bg-clinident-niebla overflow-y-auto h-screen p-6 md:p-10">
           {children}
         </main>
 

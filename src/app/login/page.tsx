@@ -22,22 +22,27 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900 text-slate-100 p-4">
-      <div className="w-full max-w-md bg-slate-800 p-8 rounded-xl shadow-2xl border border-slate-700">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-clinident-niebla p-4">
+      <div className="w-full max-w-md bg-white/95 backdrop-blur-md p-8 rounded-3xl shadow-2xl border border-clinident-denim/20">
+        
+        {/* LOGO Y TÍTULO */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-blue-400">Clinident</h1>
-          <p className="text-sm text-slate-400 mt-1">Gestión Odontológica Indacochea</p>
+          <h1 className="text-3xl font-extrabold text-clinident-real tracking-tight">Clinident</h1>
+          <p className="text-xs font-bold text-clinident-denim uppercase tracking-wider mt-1">
+            Gestión Odontológica Indacochea
+          </p>
         </div>
 
+        {/* MENSAJE DE ERROR */}
         {errorMessage && (
-          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm text-center">
+          <div className="mb-5 p-3.5 bg-red-500/10 border border-red-500/30 rounded-2xl text-red-600 text-xs font-semibold text-center animate-fade-in">
             {errorMessage}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">
+            <label className="block text-xs font-bold uppercase tracking-wider text-clinident-real mb-1.5">
               Correo Electrónico
             </label>
             <input
@@ -45,12 +50,12 @@ export default function LoginPage() {
               name="email"
               required
               placeholder="doctor@clinident.com"
-              className="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-blue-500 transition-colors"
+              className="w-full px-4 py-3 bg-clinident-relajado/30 border border-clinident-denim/30 rounded-2xl text-slate-800 placeholder-clinident-denim/60 focus:outline-none focus:border-clinident-real focus:bg-white transition-all text-sm shadow-inner"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">
+            <label className="block text-xs font-bold uppercase tracking-wider text-clinident-real mb-1.5">
               Contraseña
             </label>
             <input
@@ -58,18 +63,19 @@ export default function LoginPage() {
               name="password"
               required
               placeholder="••••••••"
-              className="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-blue-500 transition-colors"
+              className="w-full px-4 py-3 bg-clinident-relajado/30 border border-clinident-denim/30 rounded-2xl text-slate-800 placeholder-clinident-denim/60 focus:outline-none focus:border-clinident-real focus:bg-white transition-all text-sm shadow-inner"
             />
           </div>
 
           <button
             type="submit"
             disabled={isPending}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-500 font-medium rounded-lg text-white transition-colors disabled:opacity-50"
+            className="w-full py-3.5 bg-clinident-real hover:bg-[#1e3b47] font-semibold rounded-2xl text-white transition-all shadow-xl shadow-clinident-real/20 disabled:opacity-50 text-sm tracking-wide mt-2 active:scale-[0.99]"
           >
             {isPending ? 'Iniciando sesión...' : 'Ingresar al Sistema'}
           </button>
         </form>
+
       </div>
     </div>
   );
