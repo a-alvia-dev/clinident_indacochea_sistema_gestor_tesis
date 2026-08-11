@@ -7,8 +7,17 @@ import { actualizarPacienteRapido } from './actions';
 
 export function FilaPaciente({ paciente }: { paciente: any }) {
   const [desplegado, setDesplegado] = useState(false);
+  const [modoEdicion, setModoEdicion] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null);
+
+  // Al cerrar el desplegable, reiniciamos el modo edición
+  function toggleDesplegado() {
+    if (desplegado) {
+      setModoEdicion(false);
+    }
+    setDesplegado(!desplegado);
+  }
 
   async function handleGuardarCambios(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -22,11 +31,20 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
 
     if (res.success) {
       setMensaje({ tipo: 'exito', texto: '¡Datos actualizados correctamente!' });
+      setModoEdicion(false); // Volvemos al modo lectura tras guardar
       setTimeout(() => setMensaje(null), 3000);
     } else {
       setMensaje({ tipo: 'error', texto: res.error || 'Error al actualizar los datos.' });
     }
   }
+
+  // Estilos dinámicos para los inputs según si están bloqueados o editables
+  const inputClass = (modoEdicion: boolean) =>
+    `w-full border rounded-lg px-2.5 py-1.5 transition-colors focus:outline-none ${
+      modoEdicion
+        ? 'bg-slate-800 border-sky-500/50 text-slate-100 focus:border-sky-400'
+        : 'bg-slate-800/30 border-slate-700/30 text-slate-400 cursor-not-allowed opacity-80'
+    }`;
 
   return (
     <>
@@ -36,9 +54,9 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => setDesplegado(!desplegado)}
+              onClick={toggleDesplegado}
               className="p-1.5 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-slate-300 transition-colors flex items-center gap-1 text-xs"
-              title={desplegado ? 'Ocultar edición' : 'Editar / Ver detalles'}
+              title={desplegado ? 'Ocultar detalles' : 'Ver detalles'}
             >
               <svg
                 className={`w-4 h-4 transition-transform duration-200 ${
@@ -80,7 +98,6 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
           )}
         </td>
 
-        {/* ÚNICA ACCIÓN EN LA TABLA PRINCIPAL */}
         <td className="p-4 text-right">
           {paciente.tiene_historia ? (
             <Link
@@ -100,7 +117,7 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
         </td>
       </tr>
 
-      {/* PANEL DESPLEGABLE EDITABLE */}
+      {/* PANEL DESPLEGABLE */}
       {desplegado && (
         <tr className="bg-slate-900/80 border-b border-slate-700/60">
           <td colSpan={4} className="p-4">
@@ -108,9 +125,16 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
               <input type="hidden" name="id" value={paciente.id} />
 
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-sky-400 flex items-center gap-2">
-                  <span>✏️</span> Editar Ficha del Paciente
-                </h4>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-sky-400">
+                    📋 Detalle del Paciente
+                  </h4>
+                  {modoEdicion && (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-semibold border border-amber-500/30">
+                      Modo Edición
+                    </span>
+                  )}
+                </div>
                 <span className="text-[10px] text-slate-500 font-mono">ID: {paciente.id}</span>
               </div>
 
@@ -134,8 +158,9 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
                       type="text"
                       name="nombres"
                       defaultValue={paciente.nombres}
+                      readOnly={!modoEdicion}
                       required
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:border-sky-500 focus:outline-none"
+                      className={inputClass(modoEdicion)}
                     />
                   </div>
 
@@ -145,8 +170,9 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
                       type="text"
                       name="apellidos"
                       defaultValue={paciente.apellidos}
+                      readOnly={!modoEdicion}
                       required
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:border-sky-500 focus:outline-none"
+                      className={inputClass(modoEdicion)}
                     />
                   </div>
 
@@ -156,7 +182,8 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
                       type="text"
                       name="cedula"
                       defaultValue={paciente.cedula || ''}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:border-sky-500 focus:outline-none"
+                      readOnly={!modoEdicion}
+                      className={inputClass(modoEdicion)}
                     />
                   </div>
 
@@ -167,7 +194,8 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
                         type="date"
                         name="fecha_nacimiento"
                         defaultValue={paciente.fecha_nacimiento || ''}
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-200 focus:border-sky-500 focus:outline-none"
+                        readOnly={!modoEdicion}
+                        className={inputClass(modoEdicion)}
                       />
                     </div>
                     <div>
@@ -175,7 +203,8 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
                       <select
                         name="sexo"
                         defaultValue={paciente.sexo || 'Masculino'}
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-200 focus:border-sky-500 focus:outline-none"
+                        disabled={!modoEdicion}
+                        className={inputClass(modoEdicion)}
                       >
                         <option value="Masculino">Masculino</option>
                         <option value="Femenino">Femenino</option>
@@ -194,7 +223,8 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
                       type="text"
                       name="telefono"
                       defaultValue={paciente.telefono || ''}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:border-sky-500 focus:outline-none"
+                      readOnly={!modoEdicion}
+                      className={inputClass(modoEdicion)}
                     />
                   </div>
 
@@ -204,7 +234,8 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
                       type="email"
                       name="email"
                       defaultValue={paciente.email || ''}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:border-sky-500 focus:outline-none"
+                      readOnly={!modoEdicion}
+                      className={inputClass(modoEdicion)}
                     />
                   </div>
 
@@ -214,7 +245,8 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
                       type="text"
                       name="ocupacion"
                       defaultValue={paciente.ocupacion || ''}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:border-sky-500 focus:outline-none"
+                      readOnly={!modoEdicion}
+                      className={inputClass(modoEdicion)}
                     />
                   </div>
 
@@ -224,7 +256,8 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
                       type="text"
                       name="direccion"
                       defaultValue={paciente.direccion || ''}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:border-sky-500 focus:outline-none"
+                      readOnly={!modoEdicion}
+                      className={inputClass(modoEdicion)}
                     />
                   </div>
                 </div>
@@ -240,7 +273,8 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
                         type="text"
                         name="contacto_emergencia_nombre"
                         defaultValue={paciente.contacto_emergencia_nombre || ''}
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:border-sky-500 focus:outline-none"
+                        readOnly={!modoEdicion}
+                        className={inputClass(modoEdicion)}
                       />
                     </div>
 
@@ -250,7 +284,8 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
                         type="text"
                         name="contacto_emergencia_telefono"
                         defaultValue={paciente.contacto_emergencia_telefono || ''}
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:border-sky-500 focus:outline-none"
+                        readOnly={!modoEdicion}
+                        className={inputClass(modoEdicion)}
                       />
                     </div>
                   </div>
@@ -258,26 +293,50 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
 
               </div>
 
-              {/* PIE DEL DESPLEGABLE: TACHO DE BASURA Y BOTÓN GUARDAR */}
+              {/* PIE DEL DESPLEGABLE CON ACCIONES */}
               <div className="flex items-center justify-between border-t border-slate-800 pt-3 mt-2">
                 
-                {/* BOTÓN ELIMINAR CON TACHO REDISEÑADO */}
+                {/* LADO IZQUIERDO: ELIMINAR */}
                 <div className="flex items-center gap-2">
                   <BotonEliminar
                     id={paciente.id}
                     nombre={`${paciente.nombres} ${paciente.apellidos}`}
                   />
-                  <span className="text-[11px] text-slate-500 hidden sm:inline">Eliminar este paciente</span>
+                  <span className="text-[11px] text-slate-500 hidden sm:inline">Eliminar paciente</span>
                 </div>
 
-                {/* BOTÓN GUARDAR CAMBIOS */}
-                <button
-                  type="submit"
-                  disabled={cargando}
-                  className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-medium rounded-xl text-xs transition-colors shadow-lg shadow-sky-900/30 flex items-center gap-1.5 disabled:opacity-50"
-                >
-                  {cargando ? 'Guardando...' : '💾 Guardar Cambios'}
-                </button>
+                {/* LADO DERECHO: CONMUTADOR EDITAR / GUARDAR / CANCELAR */}
+                <div className="flex items-center gap-2">
+                  {!modoEdicion ? (
+                    <button
+                      type="button"
+                      onClick={() => setModoEdicion(true)}
+                      className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-sky-400 border border-slate-700 rounded-xl text-xs font-medium transition-colors flex items-center gap-1.5"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                      Editar Ficha
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setModoEdicion(false)}
+                        className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-xl text-xs font-medium transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={cargando}
+                        className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-medium rounded-xl text-xs transition-colors shadow-lg shadow-sky-900/30 flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        {cargando ? 'Guardando...' : '💾 Guardar Cambios'}
+                      </button>
+                    </>
+                  )}
+                </div>
 
               </div>
 
