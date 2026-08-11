@@ -158,6 +158,8 @@ export default function DetallePacienteClient({ paciente: pacienteInicial, histo
     formData.append('habitos', JSON.stringify(habitos));
     formData.append('piezas', JSON.stringify(piezasClinicas));
 
+const esEdicion = Boolean(historiaId);
+
     startTransition(async () => {
       let res;
       if (historiaId) {
@@ -167,7 +169,36 @@ export default function DetallePacienteClient({ paciente: pacienteInicial, histo
         if (res?.data?.id) setHistoriaId(res.data.id);
       }
 
-      if (res?.error) { alert(`Error al guardar en Supabase: ${res.error}`); return; }
+      if (res?.error) {
+        Swal.fire({
+          title: '<span class="text-base font-bold text-slate-900">Error al guardar</span>',
+          text: res.error,
+          icon: 'error',
+          confirmButtonText: 'Aceptar',
+          buttonsStyling: false,
+          customClass: {
+            popup: 'rounded-2xl border border-slate-200 p-6 bg-white shadow-xl',
+            confirmButton: 'px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl cursor-pointer'
+          }
+        });
+        return;
+      }
+
+      // 🚀 MODAL DE ÉXITO DINÁMICO CON ESTILO TAILWIND
+      Swal.fire({
+        title: `<span class="text-lg font-bold text-slate-900">${esEdicion ? '¡Historia Actualizada!' : '¡Historia Guardada!'}</span>`,
+        html: `<p class="text-xs text-slate-500 font-medium mt-1">
+                 Los cambios fueron guardados y el semáforo <span class="font-bold uppercase">${colorCalculado}</span> fue calculado correctamente.
+               </p>`,
+        icon: 'success',
+        iconColor: '#10b981',
+        timer: 1800,
+        showConfirmButton: false,
+        buttonsStyling: false,
+        customClass: {
+          popup: 'rounded-2xl border border-slate-200/80 shadow-xl bg-white p-6'
+        }
+      });
 
       setResultadoSemaforo({ color: colorCalculado, razon: razonFinal });
       setConsultaFinalizada(true);
