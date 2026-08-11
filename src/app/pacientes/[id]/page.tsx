@@ -219,15 +219,6 @@ export default function DetallePacientePage({ params }: PageProps) {
       }
     }
 
-    // REGLA C: INCLUSIÓN DINÁMICA DE ANTECEDENTES Y DETALLES EN LA DESCRIPCIÓN
-    if (tieneAntecedentes) {
-      razones.push(`Antecedentes médicos a considerar: ${antecedentesActivos.join(', ')}`);
-    }
-
-    if (resumenPiezas) {
-      razones.push(`Hallazgos en piezas: ${resumenPiezas}`);
-    }
-
     // REGLA D: EVALUACIÓN DE VERDE (Atención de Rutina)
     if (colorCalculado === 'verde') {
       razones.push('Paciente estable sin criterios de urgencia ni comorbilidades activas');
