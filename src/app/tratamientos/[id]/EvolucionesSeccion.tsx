@@ -225,14 +225,10 @@ export default function EvolucionesSeccion({
                   className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-slate-800"
                 >
                   <option value="">Ninguna / Consulta General</option>
+                  {/* MOSTRAR ÚNICAMENTE LAS PIEZAS PENDIENTES */}
                   {piezasPendientes.map((p) => (
                     <option key={p.numero_pieza} value={p.numero_pieza}>
                       Pieza {p.numero_pieza} (Pendiente)
-                    </option>
-                  ))}
-                  {piezasTratadas.map((p) => (
-                    <option key={p.numero_pieza} value={p.numero_pieza}>
-                      Pieza {p.numero_pieza} (Tratada 🟢)
                     </option>
                   ))}
                 </select>
