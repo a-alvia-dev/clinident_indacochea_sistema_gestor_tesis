@@ -1,4 +1,6 @@
 'use client';
+import { useRouter } from 'next/navigation';
+import Swal from 'sweetalert2';
 
 import { useState, useTransition, useCallback, useMemo } from 'react';
 import Link from 'next/link';
@@ -45,6 +47,7 @@ interface Props {
 }
 
 export default function DetallePacienteClient({ paciente: pacienteInicial, historiaInicial, id }: Props) {
+    const router = useRouter();
   const [paciente, setPaciente] = useState(pacienteInicial);
   const [historiaId, setHistoriaId] = useState<string | null>(historiaInicial?.id || null);
   const [isPending, startTransition] = useTransition();
@@ -172,20 +175,63 @@ export default function DetallePacienteClient({ paciente: pacienteInicial, histo
     });
   }, [id, historiaId, motivoConsulta, tipoDolor, nivelDolor, presionArterial, fiebre, otrosMeds, antecedentes, alergias, habitos, piezasClinicas]);
 
+// ELIMINAR HISTORIA CLINICA CON ESTILOS MATCH TAILWIND
   const handleEliminarHistoria = useCallback(() => {
     if (!historiaId) return;
-    if (!confirm('¿Estás seguro de eliminar esta historia clínica?')) return;
 
-    startTransition(async () => {
-      const res = await eliminarHistoriaAction(historiaId, id);
-      if (res?.error) { alert(`Error al eliminar: ${res.error}`); return; }
-      setHistoriaId(null);
-      setConsultaFinalizada(false);
-      setResultadoSemaforo(null);
-      setPaciente((prev: any) => ({ ...prev, tiene_historia: false, semaforo_color: 'verde' }));
-      alert('Historia clínica eliminada.');
+    Swal.fire({
+      title: '<span class="text-lg font-bold text-slate-900">¿Eliminar historia clínica?</span>',
+      html: '<p class="text-xs text-slate-500 font-medium mt-1">Esta acción eliminará el registro médico del paciente de forma permanente.</p>',
+      icon: 'warning',
+      iconColor: '#f43f5e',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      buttonsStyling: false, // 👈 Desactiva los estilos feos por defecto de SweetAlert
+      customClass: {
+        popup: 'rounded-2xl border border-slate-200/80 shadow-xl bg-white p-6',
+        confirmButton: 'px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer mr-2',
+        cancelButton: 'px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer',
+      }
+    }).then((result) => {
+      if (result.isConfirmed) {
+        startTransition(async () => {
+          const res = await eliminarHistoriaAction(historiaId, id);
+          
+          if (res?.error) {
+            Swal.fire({
+              title: '<span class="text-base font-bold text-slate-900">Error al eliminar</span>',
+              text: res.error,
+              icon: 'error',
+              confirmButtonText: 'Aceptar',
+              buttonsStyling: false,
+              customClass: {
+                popup: 'rounded-2xl border border-slate-200 p-6',
+                confirmButton: 'px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl'
+              }
+            });
+            return;
+          }
+
+          Swal.fire({
+            title: '<span class="text-base font-bold text-slate-900">¡Historia Eliminada!</span>',
+            text: 'Redirigiendo a la lista de pacientes...',
+            icon: 'success',
+            iconColor: '#10b981',
+            timer: 1500,
+            showConfirmButton: false,
+            buttonsStyling: false,
+            customClass: {
+              popup: 'rounded-2xl border border-slate-200 p-6'
+            }
+          });
+
+          router.push('/pacientes');
+          router.refresh();
+        });
+      }
     });
-  }, [historiaId, id]);
+  }, [historiaId, id, router]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20">
