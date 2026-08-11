@@ -5,12 +5,12 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '../lib/supabase/client';
 
-// 1. Extraemos los links fuera del componente para no recrearlos en memoria en cada render
+// 1. Reordenamos NAV_LINKS siguiendo el flujo clínico lógico
 const NAV_LINKS = [
   { name: '📊 Dashboard', href: '/dashboard' },
   { name: '👥 Pacientes', href: '/pacientes' },
-  { name: '📅 Citas y Agenda', href: '/citas' },
-  { name: '🦷 Tratamientos', href: '#' },
+  { name: '🦷 Tratamientos', href: '/tratamientos' }, // 👈 Posición optimizada (Capa Clínica)
+  { name: '📅 Citas y Agenda', href: '/citas' },       // 👈 Posición optimizada (Capa Operativa)
   { name: '💳 Pagos y Cajas', href: '#' },
   { name: '⚙️ Gestión de Personal', href: '/usuarios' },
 ] as const;
@@ -43,14 +43,14 @@ function Sidebar() {
         {/* Menú de Navegación */}
         <nav className="space-y-2">
           {NAV_LINKS.map((link) => {
-            const isActive = pathname === link.href;
+            // Verificamos si la ruta activa coincide exactamente o es una subruta (ej: /tratamientos/1)
+            const isActive = link.href !== '#' && (pathname === link.href || pathname.startsWith(`${link.href}/`));
             const isPlaceholder = link.href === '#';
 
             return (
               <Link
                 key={link.name}
                 href={link.href}
-                // ⚡ Prefetch activo para precargar el JS/HTML del módulo en segundo plano
                 prefetch={!isPlaceholder}
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
                   isActive
