@@ -21,15 +21,12 @@ export async function obtenerPacientes(busqueda?: string) {
   return data;
 }
 
-// ===================================================
-// 2. OBTENER PACIENTE POR ID
-// ===================================================
 export async function obtenerPacientePorId(id: string) {
   const supabase = await createClient();
 
   const { data, error } = await supabase
     .from('pacientes')
-    .select('*')
+    .select('id, nombres, apellidos, cedula, telefono, tiene_historia, semaforo_color')
     .eq('id', id)
     .single();
 
