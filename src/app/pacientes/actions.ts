@@ -37,17 +37,36 @@ export async function obtenerPacientePorId(id: string) {
 export async function crearPacienteAction(formData: FormData) {
   const supabase = await createClient();
 
+  const fechaNacimientoRaw = formData.get('fecha_nacimiento') as string;
+  const fecha_nacimiento = fechaNacimientoRaw && fechaNacimientoRaw.trim() !== '' 
+    ? fechaNacimientoRaw 
+    : '2000-01-01';
+
   const pacienteData = {
     nombres: formData.get('nombres') as string,
     apellidos: formData.get('apellidos') as string,
     cedula: formData.get('cedula') as string,
+    fecha_nacimiento,
+    sexo: formData.get('sexo') as string,
+    ocupacion: formData.get('ocupacion') as string,
     telefono: formData.get('telefono') as string,
     email: formData.get('email') as string,
+    direccion: formData.get('direccion') as string,
+    contacto_emergencia_nombre: formData.get('contacto_emergencia_nombre') as string,
+    contacto_emergencia_telefono: formData.get('contacto_emergencia_telefono') as string,
+    semaforo_color: 'verde',
+    clasificacion_dental: 'VERDE',
   };
 
   const { data, error } = await supabase.from('pacientes').insert([pacienteData]).select().single();
 
   if (error) {
+    if (error.code === '23505' || error.message.includes('pacientes_cedula_key')) {
+      return { 
+        success: false, 
+        error: 'Ya existe un paciente registrado con este número de cédula/DNI.' 
+      };
+    }
     return { success: false, error: error.message };
   }
 
@@ -55,7 +74,67 @@ export async function crearPacienteAction(formData: FormData) {
   return { success: true, paciente: data };
 }
 
-// 4. Aperturar Historia Clínica y Calcular Semáforo
+// 4. Actualizar paciente existente (EDITAR)
+export async function actualizarPacienteAction(id: string, formData: FormData) {
+  const supabase = await createClient();
+
+  const fechaNacimientoRaw = formData.get('fecha_nacimiento') as string;
+  const fecha_nacimiento = fechaNacimientoRaw && fechaNacimientoRaw.trim() !== '' 
+    ? fechaNacimientoRaw 
+    : '2000-01-01';
+
+  const pacienteData = {
+    nombres: formData.get('nombres') as string,
+    apellidos: formData.get('apellidos') as string,
+    cedula: formData.get('cedula') as string,
+    fecha_nacimiento,
+    sexo: formData.get('sexo') as string,
+    ocupacion: formData.get('ocupacion') as string,
+    telefono: formData.get('telefono') as string,
+    email: formData.get('email') as string,
+    direccion: formData.get('direccion') as string,
+    contacto_emergencia_nombre: formData.get('contacto_emergencia_nombre') as string,
+    contacto_emergencia_telefono: formData.get('contacto_emergencia_telefono') as string,
+  };
+
+  const { error } = await supabase
+    .from('pacientes')
+    .update(pacienteData)
+    .eq('id', id);
+
+  if (error) {
+    if (error.code === '23505' || error.message.includes('pacientes_cedula_key')) {
+      return { 
+        success: false, 
+        error: 'Ya existe otro paciente registrado con esta cédula/DNI.' 
+      };
+    }
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/pacientes');
+  revalidatePath(`/pacientes/${id}`);
+  return { success: true };
+}
+
+// 5. Eliminar paciente (ELIMINAR)
+export async function eliminarPacienteAction(id: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('pacientes')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/pacientes');
+  return { success: true };
+}
+
+// 6. Aperturar Historia Clínica y Calcular Semáforo
 export async function aperturarHistoriaAction(formData: FormData) {
   const supabase = await createClient();
 
@@ -72,7 +151,6 @@ export async function aperturarHistoriaAction(formData: FormData) {
   let color: 'rojo' | 'naranja' | 'verde' = 'verde';
   let razon = 'Atención estándar. Paciente estable sin signos críticos observados.';
 
-  // Regla Roja: Dolor Severo o Hallazgos Críticos
   const hallazgosCriticos = ['infeccion_absceso', 'trauma_fractura', 'movilidad_severa'];
   const tieneHallazgoCritico = hallazgos_bucales.some(h => hallazgosCriticos.includes(h));
 
@@ -82,7 +160,6 @@ export async function aperturarHistoriaAction(formData: FormData) {
       ? 'Urgencia detectada: Presenta signos de infección activa, traumatismo o movilidad severa.'
       : 'Urgencia detectada: Paciente reporta dolor severo / agudo.';
   } 
-  // Regla Naranja: Dolor Leve o Periodontitis
   else if (
     nivel_dolor === 'leve' || 
     estado_encias === 'periodontitis' || 
@@ -92,7 +169,6 @@ export async function aperturarHistoriaAction(formData: FormData) {
     razon = 'Prioridad media: Presenta sintomatología leve, caries profundas o inflamación periodontal activa.';
   }
 
-  // Guardar en la base de datos
   const { error } = await supabase
     .from('pacientes')
     .update({
