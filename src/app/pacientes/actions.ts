@@ -21,6 +21,9 @@ export async function obtenerPacientes(busqueda?: string) {
   return data;
 }
 
+// ===================================================
+// 2. OBTENER PACIENTE POR ID
+// ===================================================
 export async function obtenerPacientePorId(id: string) {
   const supabase = await createClient();
 
@@ -162,7 +165,6 @@ export async function aperturarHistoriaAction(formData: FormData) {
   const habitos = JSON.parse((formData.get('habitos') as string) || '[]');
   const piezas = JSON.parse((formData.get('piezas') as string) || '[]');
 
-  // Insertar en historias_clinicas
   const { data: historia, error: errorHistoria } = await supabase
     .from('historias_clinicas')
     .insert([
@@ -187,7 +189,6 @@ export async function aperturarHistoriaAction(formData: FormData) {
     return { success: false, error: errorHistoria.message };
   }
 
-  // Actualizar estado general en tabla pacientes
   await supabase
     .from('pacientes')
     .update({
@@ -199,7 +200,7 @@ export async function aperturarHistoriaAction(formData: FormData) {
 
   revalidatePath('/pacientes');
   revalidatePath(`/pacientes/${pacienteId}`);
-  revalidatePath('/tratamientos'); // ⚡ Fuerza actualización inmediata del módulo Tratamientos
+  revalidatePath('/tratamientos');
 
   return { success: true, data: historia };
 }
@@ -265,7 +266,6 @@ export async function actualizarHistoriaAction(historiaId: string, formData: For
     return { success: false, error: error.message };
   }
 
-  // Actualizar resumen en la tabla pacientes
   await supabase
     .from('pacientes')
     .update({
@@ -276,7 +276,7 @@ export async function actualizarHistoriaAction(historiaId: string, formData: For
 
   revalidatePath('/pacientes');
   revalidatePath(`/pacientes/${pacienteId}`);
-  revalidatePath('/tratamientos'); // ⚡ Fuerza actualización inmediata del módulo Tratamientos
+  revalidatePath('/tratamientos');
   return { success: true };
 }
 
@@ -296,7 +296,6 @@ export async function eliminarHistoriaAction(historiaId: string, pacienteId: str
     return { success: false, error: error.message };
   }
 
-  // Restaurar paciente a sin historia
   await supabase
     .from('pacientes')
     .update({
@@ -308,7 +307,7 @@ export async function eliminarHistoriaAction(historiaId: string, pacienteId: str
 
   revalidatePath('/pacientes');
   revalidatePath(`/pacientes/${pacienteId}`);
-  revalidatePath('/tratamientos'); // ⚡ Fuerza actualización inmediata del módulo Tratamientos
+  revalidatePath('/tratamientos');
 
   return { success: true };
 }
@@ -319,4 +318,37 @@ export async function eliminarHistoriaAction(historiaId: string, pacienteId: str
 export async function actualizarPacienteRapido(formData: FormData) {
   const id = formData.get('id') as string;
   return await actualizarPacienteAction(id, formData);
+}
+
+// ===================================================
+// 11. REGISTRAR NUEVA EVOLUCIÓN / ATENCIÓN
+// ===================================================
+export async function crearEvolucionAction(formData: FormData) {
+  const supabase = await createClient();
+
+  const pacienteId = formData.get('pacienteId') as string;
+  const historiaId = formData.get('historiaId') as string;
+  const procedimiento = formData.get('procedimiento') as string;
+  const observaciones = formData.get('observaciones') as string;
+  const proximaCita = formData.get('proxima_cita') as string || null;
+
+  const { error } = await supabase
+    .from('evoluciones_tratamiento')
+    .insert([
+      {
+        paciente_id: pacienteId,
+        historia_id: historiaId || null,
+        procedimiento,
+        observaciones,
+        proxima_cita: proximaCita,
+      }
+    ]);
+
+  if (error) {
+    console.error('❌ Error al registrar evolución:', error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath(`/tratamientos/${pacienteId}`);
+  return { success: true };
 }

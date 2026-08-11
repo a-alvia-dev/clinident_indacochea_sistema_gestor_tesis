@@ -18,7 +18,7 @@ export default async function TratamientosPage() {
     .from('pacientes')
     .select('*');
 
-  // 🔴 VERIFICACIÓN EN CONSOLA DEL SERVIDOR (Terminal donde corre 'npm run dev')
+  // 🔴 VERIFICACIÓN EN CONSOLA DEL SERVIDOR
   console.log('--- DIAGNÓSTICO TRATAMIENTOS ---');
   console.log('Historias encontradas:', historias?.length || 0, errorHistorias || '');
   console.log('Pacientes encontrados:', pacientes?.length || 0, errorPacientes || '');
@@ -73,22 +73,35 @@ export default async function TratamientosPage() {
             const p = historia.pacientes;
             const nombreCompleto = p.nombre || `${p.nombres || ''} ${p.apellidos || ''}`.trim() || 'Paciente sin Nombre';
             
+            // PARSEO RESISTENTE DE ALERGIAS
             let alergiasArray: string[] = [];
             if (historia.alergias) {
               try {
-                alergiasArray = typeof historia.alergias === 'string' ? JSON.parse(historia.alergias) : historia.alergias;
+                if (Array.isArray(historia.alergias)) {
+                  alergiasArray = historia.alergias;
+                } else if (typeof historia.alergias === 'string') {
+                  const parsed = JSON.parse(historia.alergias);
+                  alergiasArray = Array.isArray(parsed) ? parsed : [historia.alergias];
+                }
               } catch {
-                alergiasArray = [];
+                alergiasArray = typeof historia.alergias === 'string' ? [historia.alergias] : [];
               }
             }
+
             const alergiasLimpias = Array.isArray(alergiasArray)
-              ? alergiasArray.filter((a: string) => a !== 'Ninguna Conocida' && a?.trim() !== '')
+              ? alergiasArray.filter((a: any) => typeof a === 'string' && a !== 'Ninguna Conocida' && a.trim() !== '')
               : [];
 
+            // PARSEO RESISTENTE DE PIEZAS DENTALES
             let piezasArray: any[] = [];
             if (historia.piezas_dentales) {
               try {
-                piezasArray = typeof historia.piezas_dentales === 'string' ? JSON.parse(historia.piezas_dentales) : historia.piezas_dentales;
+                if (Array.isArray(historia.piezas_dentales)) {
+                  piezasArray = historia.piezas_dentales;
+                } else if (typeof historia.piezas_dentales === 'string') {
+                  const parsed = JSON.parse(historia.piezas_dentales);
+                  piezasArray = Array.isArray(parsed) ? parsed : [];
+                }
               } catch {
                 piezasArray = [];
               }
@@ -146,7 +159,7 @@ export default async function TratamientosPage() {
                       <Calendar className="w-3 h-3" />
                       Apertura: {new Date(historia.created_at).toLocaleDateString()}
                     </span>
-                    <span className="font-semibold text-teal-600">EVA {historia.nivel_dolor || 0}/10</span>
+                    <span className="font-semibold text-teal-600">EVA {historia.nivel_dolor ?? 0}/10</span>
                   </div>
                 </div>
 
