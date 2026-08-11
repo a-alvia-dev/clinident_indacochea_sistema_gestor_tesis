@@ -3,7 +3,9 @@
 import { createClient } from '../../lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 
-// 1. Obtener todos los pacientes
+// ===================================================
+// 1. OBTENER TODOS LOS PACIENTES
+// ===================================================
 export async function obtenerPacientes(busqueda?: string) {
   const supabase = await createClient();
 
@@ -19,7 +21,9 @@ export async function obtenerPacientes(busqueda?: string) {
   return data;
 }
 
-// 2. Obtener paciente por ID
+// ===================================================
+// 2. OBTENER PACIENTE POR ID
+// ===================================================
 export async function obtenerPacientePorId(id: string) {
   const supabase = await createClient();
 
@@ -33,7 +37,9 @@ export async function obtenerPacientePorId(id: string) {
   return data;
 }
 
-// 3. Crear nuevo paciente
+// ===================================================
+// 3. CREAR NUEVO PACIENTE
+// ===================================================
 export async function crearPacienteAction(formData: FormData) {
   const supabase = await createClient();
 
@@ -74,7 +80,9 @@ export async function crearPacienteAction(formData: FormData) {
   return { success: true, paciente: data };
 }
 
-// 4. Actualizar paciente existente (EDITAR)
+// ===================================================
+// 4. ACTUALIZAR PACIENTE EXISTENTE (EDITAR PACIENTE)
+// ===================================================
 export async function actualizarPacienteAction(id: string, formData: FormData) {
   const supabase = await createClient();
 
@@ -117,7 +125,9 @@ export async function actualizarPacienteAction(id: string, formData: FormData) {
   return { success: true };
 }
 
-// 5. Eliminar paciente (ELIMINAR)
+// ===================================================
+// 5. ELIMINAR PACIENTE
+// ===================================================
 export async function eliminarPacienteAction(id: string) {
   const supabase = await createClient();
 
@@ -134,68 +144,175 @@ export async function eliminarPacienteAction(id: string) {
   return { success: true };
 }
 
-// 6. Aperturar Historia Clínica y Calcular Semáforo
+// ===================================================
+// 6. HISTORIA CLÍNICA: CREAR / APERTURAR
+// ===================================================
 export async function aperturarHistoriaAction(formData: FormData) {
   const supabase = await createClient();
 
   const pacienteId = formData.get('pacienteId') as string;
-  const enfermedades_sistemicas = formData.getAll('enfermedades_sistemicas') as string[];
-  const alergias_tipo = formData.get('alergias_tipo') as string;
-  const alergias_detalle = formData.get('alergias_detalle') as string;
-  const motivo_consulta = formData.get('motivo_consulta') as string;
-  const nivel_dolor = formData.get('nivel_dolor') as string;
-  const estado_encias = formData.get('estado_encias') as string;
-  const hallazgos_bucales = formData.getAll('hallazgos_bucales') as string[];
+  const motivo = formData.get('motivo') as string;
+  const tipoDolor = formData.get('tipoDolor') as string;
+  const nivelDolor = Number(formData.get('nivel_dolor') || 0);
+  const semaforoColor = formData.get('semaforo_color') as string;
+  const semaforoRazon = formData.get('semaforo_razon') as string;
 
-  // --- ALGORITMO DE TRIAJE Y SEMAFORIZACIÓN ---
-  let color: 'rojo' | 'naranja' | 'verde' = 'verde';
-  let razon = 'Atención estándar. Paciente estable sin signos críticos observados.';
+  const antecedentes = JSON.parse((formData.get('antecedentes') as string) || '[]');
+  const alergias = JSON.parse((formData.get('alergias') as string) || '[]');
+  const habitos = JSON.parse((formData.get('habitos') as string) || '[]');
+  const piezas = JSON.parse((formData.get('piezas') as string) || '[]');
 
-  const hallazgosCriticos = ['infeccion_absceso', 'trauma_fractura', 'movilidad_severa'];
-  const tieneHallazgoCritico = hallazgos_bucales.some(h => hallazgosCriticos.includes(h));
+  // Insertar en historias_clinicas
+  const { data: historia, error: errorHistoria } = await supabase
+    .from('historias_clinicas')
+    .insert([
+      {
+        paciente_id: pacienteId,
+        motivo_consulta: motivo,
+        tipo_dolor: tipoDolor,
+        nivel_dolor: nivelDolor,
+        antecedentes: antecedentes,
+        alergias: alergias,
+        habitos: habitos,
+        piezas_dentales: piezas,
+        semaforo_color: semaforoColor,
+        semaforo_razon: semaforoRazon,
+      }
+    ])
+    .select()
+    .single();
 
-  if (nivel_dolor === 'severo' || tieneHallazgoCritico) {
-    color = 'rojo';
-    razon = tieneHallazgoCritico 
-      ? 'Urgencia detectada: Presenta signos de infección activa, traumatismo o movilidad severa.'
-      : 'Urgencia detectada: Paciente reporta dolor severo / agudo.';
-  } 
-  else if (
-    nivel_dolor === 'leve' || 
-    estado_encias === 'periodontitis' || 
-    hallazgos_bucales.includes('caries_profunda')
-  ) {
-    color = 'naranja';
-    razon = 'Prioridad media: Presenta sintomatología leve, caries profundas o inflamación periodontal activa.';
+  if (errorHistoria) {
+    console.error('❌ Error Supabase al crear historia:', errorHistoria);
+    return { success: false, error: errorHistoria.message };
   }
 
-  const { error } = await supabase
+  // Actualizar estado general en tabla pacientes
+  await supabase
     .from('pacientes')
     .update({
       tiene_historia: true,
-      motivo_consulta,
-      nivel_dolor,
-      alergias_tipo,
-      alergias_detalle,
-      estado_encias,
-      semaforo_color: color,
-      semaforo_razon: razon,
-      enfermedades_sistemicas,
-      hallazgos_bucales,
+      semaforo_color: semaforoColor,
+      semaforo_razon: semaforoRazon,
     })
     .eq('id', pacienteId);
-
-  if (error) {
-    return { success: false, error: error.message };
-  }
 
   revalidatePath('/pacientes');
   revalidatePath(`/pacientes/${pacienteId}`);
 
-  return { success: true, color, razon };
+  return { success: true, data: historia };
 }
 
-// 7. Actualización rápida para la Fila Desplegable
+// ===================================================
+// 7. HISTORIA CLÍNICA: LEER / CONSULTAR
+// ===================================================
+export async function obtenerHistoriaClinicaPorPaciente(pacienteId: string) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('historias_clinicas')
+    .select('*')
+    .eq('paciente_id', pacienteId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error('❌ Error al obtener historia:', error);
+    return null;
+  }
+
+  return data;
+}
+
+// ===================================================
+// 8. HISTORIA CLÍNICA: ACTUALIZAR / EDITAR
+// ===================================================
+export async function actualizarHistoriaAction(historiaId: string, formData: FormData) {
+  const supabase = await createClient();
+
+  const pacienteId = formData.get('pacienteId') as string;
+  const motivo = formData.get('motivo') as string;
+  const tipoDolor = formData.get('tipoDolor') as string;
+  const nivelDolor = Number(formData.get('nivel_dolor') || 0);
+  const semaforoColor = formData.get('semaforo_color') as string;
+  const semaforoRazon = formData.get('semaforo_razon') as string;
+
+  const antecedentes = JSON.parse((formData.get('antecedentes') as string) || '[]');
+  const alergias = JSON.parse((formData.get('alergias') as string) || '[]');
+  const habitos = JSON.parse((formData.get('habitos') as string) || '[]');
+  const piezas = JSON.parse((formData.get('piezas') as string) || '[]');
+
+  const { error } = await supabase
+    .from('historias_clinicas')
+    .update({
+      motivo_consulta: motivo,
+      tipo_dolor: tipoDolor,
+      nivel_dolor: nivelDolor,
+      antecedentes: antecedentes,
+      alergias: alergias,
+      habitos: habitos,
+      piezas_dentales: piezas,
+      semaforo_color: semaforoColor,
+      semaforo_razon: semaforoRazon,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', historiaId);
+
+  if (error) {
+    console.error('❌ Error al actualizar historia:', error);
+    return { success: false, error: error.message };
+  }
+
+  // Actualizar resumen en la tabla pacientes
+  await supabase
+    .from('pacientes')
+    .update({
+      semaforo_color: semaforoColor,
+      semaforo_razon: semaforoRazon,
+    })
+    .eq('id', pacienteId);
+
+  revalidatePath('/pacientes');
+  revalidatePath(`/pacientes/${pacienteId}`);
+  return { success: true };
+}
+
+// ===================================================
+// 9. HISTORIA CLÍNICA: ELIMINAR
+// ===================================================
+export async function eliminarHistoriaAction(historiaId: string, pacienteId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('historias_clinicas')
+    .delete()
+    .eq('id', historiaId);
+
+  if (error) {
+    console.error('❌ Error al eliminar historia:', error);
+    return { success: false, error: error.message };
+  }
+
+  // Restaurar paciente a sin historia
+  await supabase
+    .from('pacientes')
+    .update({
+      tiene_historia: false,
+      semaforo_color: 'verde',
+      semaforo_razon: null,
+    })
+    .eq('id', pacienteId);
+
+  revalidatePath('/pacientes');
+  revalidatePath(`/pacientes/${pacienteId}`);
+
+  return { success: true };
+}
+
+// ===================================================
+// 10. ACTUALIZACIÓN RÁPIDA (FILA DESPLEGABLE)
+// ===================================================
 export async function actualizarPacienteRapido(formData: FormData) {
   const id = formData.get('id') as string;
   return await actualizarPacienteAction(id, formData);

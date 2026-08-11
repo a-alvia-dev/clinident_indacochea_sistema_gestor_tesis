@@ -2,7 +2,13 @@
 
 import { useState, useEffect, useTransition, use } from 'react';
 import Link from 'next/link';
-import { obtenerPacientePorId, aperturarHistoriaAction } from '../actions';
+import { 
+  obtenerPacientePorId, 
+  aperturarHistoriaAction, 
+  obtenerHistoriaClinicaPorPaciente, 
+  actualizarHistoriaAction, 
+  eliminarHistoriaAction 
+} from '../actions';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -20,6 +26,7 @@ export default function DetallePacientePage({ params }: PageProps) {
 
   // Carga de Paciente
   const [paciente, setPaciente] = useState<any>(null);
+  const [historiaId, setHistoriaId] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
   const [isPending, startTransition] = useTransition();
 
@@ -34,7 +41,6 @@ export default function DetallePacientePage({ params }: PageProps) {
   const [presionArterial, setPresionArterial] = useState('');
   const [fiebre, setFiebre] = useState('No');
   const [otrosMeds, setOtrosMeds] = useState('');
-  const [observacionesMedicas, setObservacionesMedicas] = useState('');
 
   // 5. MOTIVO Y SÍNTOMAS
   const [motivoConsulta, setMotivoConsulta] = useState('Consulta Preventiva / Limpieza');
@@ -61,16 +67,51 @@ export default function DetallePacientePage({ params }: PageProps) {
   const cuadrante4 = [48, 47, 46, 45, 44, 43, 42, 41];
   const cuadrante3 = [31, 32, 33, 34, 35, 36, 37, 38];
 
+  // CARGAR PACIENTE E HISTORIA CLINICA DESDE SUPABASE
+// CARGAR PACIENTE E HISTORIA CLINICA DESDE SUPABASE
   useEffect(() => {
     async function cargar() {
+      setCargando(true);
       const data = await obtenerPacientePorId(id);
       setPaciente(data);
-      if (data?.tiene_historia) {
-        setConsultaFinalizada(true);
-        setResultadoSemaforo({
-          color: data.semaforo_color || 'verde',
-          razon: data.semaforo_razon || 'Historia previa apertures guardada.'
-        });
+
+      if (data) {
+        // Cargar historia detallada si existe
+        const historia = await obtenerHistoriaClinicaPorPaciente(id);
+        if (historia) {
+          setHistoriaId(historia.id);
+          setMotivoConsulta(historia.motivo_consulta || 'Consulta Preventiva / Limpieza');
+          setTipoDolor(historia.tipo_dolor || 'Ninguno / Asintomático');
+          setNivelDolor(historia.nivel_dolor || 0);
+          setPresionArterial(historia.presion_arterial || '');
+          setFiebre(historia.fiebre || 'No');
+          setOtrosMeds(historia.otros_meds || '');
+
+          // GARANTIZAR QUE SIEMPRE SEAN ARREGLOS
+          const parseArray = (val: any) => {
+            if (Array.isArray(val)) return val;
+            if (typeof val === 'string') {
+              try {
+                const parsed = JSON.parse(val);
+                return Array.isArray(parsed) ? parsed : [];
+              } catch {
+                return [];
+              }
+            }
+            return [];
+          };
+
+          setAntecedentes(parseArray(historia.antecedentes));
+          setAlergias(parseArray(historia.alergias));
+          setHabitos(parseArray(historia.habitos));
+          setPiezasClinicas(parseArray(historia.piezas_dentales));
+
+          setResultadoSemaforo({
+            color: historia.semaforo_color || 'verde',
+            razon: historia.semaforo_razon || 'Historia previa registrada.'
+          });
+          setConsultaFinalizada(true);
+        }
       }
       setCargando(false);
     }
@@ -78,22 +119,26 @@ export default function DetallePacientePage({ params }: PageProps) {
   }, [id]);
 
   // Manejadores de Estado (Checkbox Garantizado)
+// Manejadores de Estado Garantizados como Array
   const handleToggleAntecedente = (item: string) => {
-    setAntecedentes(prev =>
-      prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]
-    );
+    setAntecedentes(prev => {
+      const list = Array.isArray(prev) ? prev : [];
+      return list.includes(item) ? list.filter(i => i !== item) : [...list, item];
+    });
   };
 
   const handleToggleAlergia = (item: string) => {
-    setAlergias(prev =>
-      prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]
-    );
+    setAlergias(prev => {
+      const list = Array.isArray(prev) ? prev : [];
+      return list.includes(item) ? list.filter(i => i !== item) : [...list, item];
+    });
   };
 
   const handleToggleHabito = (item: string) => {
-    setHabitos(prev =>
-      prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]
-    );
+    setHabitos(prev => {
+      const list = Array.isArray(prev) ? prev : [];
+      return list.includes(item) ? list.filter(i => i !== item) : [...list, item];
+    });
   };
 
   // Guardar Pieza Dental
@@ -114,7 +159,7 @@ export default function DetallePacientePage({ params }: PageProps) {
     setPiezasClinicas(prev => prev.filter(p => p.pieza !== numPieza));
   };
 
-  // FINALIZAR Y EVALUAR ALGORITMO INTEGRADO
+  // FINALIZAR Y GUARDAR EN SUPABASE (CREAR / EDITAR)
   const handleFinalizarConsulta = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -166,19 +211,60 @@ export default function DetallePacientePage({ params }: PageProps) {
 
     const razonFinal = razones.join('. ') + '.';
 
+    // Empaquetar formulario para Server Action
     const formData = new FormData();
     formData.append('pacienteId', id);
     formData.append('motivo', motivoConsulta);
+    formData.append('tipoDolor', tipoDolor);
     formData.append('nivel_dolor', nivelDolor.toString());
+    formData.append('presionArterial', presionArterial);
+    formData.append('fiebre', fiebre);
+    formData.append('otrosMeds', otrosMeds);
+    formData.append('semaforo_color', colorCalculado);
+    formData.append('semaforo_razon', razonFinal);
+    formData.append('antecedentes', JSON.stringify(antecedentes));
+    formData.append('alergias', JSON.stringify(alergias));
+    formData.append('habitos', JSON.stringify(habitos));
+    formData.append('piezas', JSON.stringify(piezasClinicas));
 
     startTransition(async () => {
-      await aperturarHistoriaAction(formData);
-      setResultadoSemaforo({
-        color: colorCalculado,
-        razon: razonFinal
-      });
+      let res;
+      if (historiaId) {
+        res = await actualizarHistoriaAction(historiaId, formData);
+      } else {
+        res = await aperturarHistoriaAction(formData);
+        if (res?.data?.id) setHistoriaId(res.data.id);
+      }
+
+      if (res?.error) {
+        alert(`Error al guardar en Supabase: ${res.error}`);
+        return;
+      }
+
+      setResultadoSemaforo({ color: colorCalculado, razon: razonFinal });
       setConsultaFinalizada(true);
-      setPaciente((prev: any) => ({ ...prev, tiene_historia: true }));
+      setPaciente((prev: any) => ({ ...prev, tiene_historia: true, semaforo_color: colorCalculado }));
+    });
+  };
+
+  // ELIMINAR HISTORIA CLINICA
+  const handleEliminarHistoria = () => {
+    if (!historiaId) return;
+
+    if (!confirm('¿Estás seguro de eliminar esta historia clínica? Esta acción no se puede deshacer.')) return;
+
+    startTransition(async () => {
+      const res = await eliminarHistoriaAction(historiaId, id);
+      if (res?.error) {
+        alert(`Error al eliminar: ${res.error}`);
+        return;
+      }
+
+      setHistoriaId(null);
+      setConsultaFinalizada(false);
+      setResultadoSemaforo(null);
+      setPaciente((prev: any) => ({ ...prev, tiene_historia: false, semaforo_color: 'verde' }));
+      alert('Historia clínica eliminada.');
     });
   };
 
@@ -251,12 +337,32 @@ export default function DetallePacientePage({ params }: PageProps) {
         </div>
       )}
 
-      {/* SI YA ESTÁ FINALIZADO */}
+      {/* SI YA ESTÁ FINALIZADO MOSTRAR RESUMEN + BOTONES DE ACCIÓN (EDITAR / ELIMINAR) */}
       {consultaFinalizada ? (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
-          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b pb-2">
-            Resumen Clínico Registrado
-          </h2>
+        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-6">
+          <div className="flex justify-between items-center border-b pb-3">
+            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+              Resumen Clínico Guardado en Supabase
+            </h2>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConsultaFinalizada(false)}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg transition-all cursor-pointer"
+              >
+                ✏️ Modificar / Editar Historia
+              </button>
+              <button
+                type="button"
+                onClick={handleEliminarHistoria}
+                disabled={isPending}
+                className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-lg border border-red-200 transition-all cursor-pointer"
+              >
+                🗑️ Eliminar Historia
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
             <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
               <span className="text-slate-400 font-medium block mb-1">Motivo:</span>
@@ -271,9 +377,29 @@ export default function DetallePacientePage({ params }: PageProps) {
               <span className="font-bold text-[#0284c7]">{piezasClinicas.length} Pieza(s) registradas</span>
             </div>
           </div>
+
+          {/* LISTA DETALLADA DE PIEZAS EN MODO LECTURA */}
+          {piezasClinicas.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold text-slate-500 uppercase">Detalle del Odontograma:</h3>
+              <div className="divide-y border rounded-xl overflow-hidden text-xs">
+                {piezasClinicas.map(p => (
+                  <div key={p.pieza} className="p-3 bg-slate-50 flex justify-between items-center">
+                    <div>
+                      <span className="font-bold text-[#0284c7]">Pieza #{p.pieza}:</span> {p.hallazgo}
+                      {p.nota && <span className="text-slate-500 italic"> ({p.nota})</span>}
+                    </div>
+                    <span className="font-semibold text-slate-700 bg-white px-2 py-1 rounded border">
+                      Tratamiento: {p.tratamiento}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
-        /* FORMULARIO COMPLETO DE TRIAJE Y ODONTOGRAMA */
+        /* FORMULARIO COMPLETO DE TRIAJE Y ODONTOGRAMA (CREAR O EDITAR) */
         <form onSubmit={handleFinalizarConsulta} className="space-y-6">
           
           {/* APARTADO 1: ANAMNESIS DENTOMÉDICA EXTENSA */}
@@ -285,7 +411,7 @@ export default function DetallePacientePage({ params }: PageProps) {
               </p>
             </div>
 
-            {/* A. Antecedentes Médicos Sistémicos (REDUCIDOS A 8 OPCIONES CLAVE) */}
+            {/* A. Antecedentes Médicos Sistémicos */}
             <div className="space-y-3">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">
                 A. Antecedentes Médicos Sistémicos
@@ -750,7 +876,7 @@ export default function DetallePacientePage({ params }: PageProps) {
             disabled={isPending}
             className="w-full py-4 bg-slate-900 text-white rounded-2xl font-extrabold text-base hover:bg-slate-800 transition-all shadow-md cursor-pointer"
           >
-            {isPending ? 'Analizando expediente clínico...' : 'Finalizar Consulta y Calcular Semáforo'}
+            {isPending ? 'Guardando en Supabase...' : historiaId ? 'Actualizar Historia Clínica y Recalcular' : 'Finalizar Consulta y Calcular Semáforo'}
           </button>
 
         </form>
