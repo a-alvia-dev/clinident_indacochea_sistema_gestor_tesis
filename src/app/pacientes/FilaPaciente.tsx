@@ -5,17 +5,31 @@ import Link from 'next/link';
 import { BotonEliminar } from './BotonEliminar';
 import { actualizarPacienteRapido } from './actions';
 
-export function FilaPaciente({ paciente }: { paciente: any }) {
-  const [desplegado, setDesplegado] = useState(false);
+interface FilaPacienteProps {
+  paciente: any;
+  estaDesplegado?: boolean;
+  onToggle?: () => void;
+}
+
+export function FilaPaciente({ paciente, estaDesplegado, onToggle }: FilaPacienteProps) {
   const [modoEdicion, setModoEdicion] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null);
 
-  function toggleDesplegado() {
-    if (desplegado) {
-      setModoEdicion(false);
-    }
-    setDesplegado(!desplegado);
+  // Funciones sanitizadoras en tiempo real
+  const handleSoloLetrasInput = (e: React.FormEvent<HTMLInputElement>) => {
+    e.currentTarget.value = e.currentTarget.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
+  };
+
+  const handleSoloNumerosInput = (e: React.FormEvent<HTMLInputElement>, maxLen: number = 10) => {
+    let val = e.currentTarget.value.replace(/\D/g, '');
+    if (val.length > maxLen) val = val.slice(0, maxLen);
+    e.currentTarget.value = val;
+  };
+
+  function handleToggleClick() {
+    if (modoEdicion) setModoEdicion(false);
+    if (onToggle) onToggle();
   }
 
   async function handleGuardarCambios(e: React.FormEvent<HTMLFormElement>) {
@@ -53,13 +67,13 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={toggleDesplegado}
+              onClick={handleToggleClick}
               className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors flex items-center gap-1 text-xs border border-slate-200"
-              title={desplegado ? 'Ocultar detalles' : 'Ver detalles'}
+              title={estaDesplegado ? 'Ocultar detalles' : 'Ver detalles'}
             >
               <svg
                 className={`w-4 h-4 transition-transform duration-200 ${
-                  desplegado ? 'rotate-180 text-blue-600' : ''
+                  estaDesplegado ? 'rotate-180 text-blue-600' : ''
                 }`}
                 fill="none"
                 viewBox="0 0 24 24"
@@ -120,7 +134,7 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
       </tr>
 
       {/* PANEL DESPLEGABLE */}
-      {desplegado && (
+      {estaDesplegado && (
         <tr className="bg-slate-100/70 border-b border-slate-200">
           <td colSpan={4} className="p-4">
             <form onSubmit={handleGuardarCambios} className="bg-white p-5 rounded-2xl border border-slate-300/80 shadow-md space-y-4">
@@ -160,6 +174,7 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
                       type="text"
                       name="nombres"
                       defaultValue={paciente.nombres}
+                      onInput={handleSoloLetrasInput}
                       readOnly={!modoEdicion}
                       required
                       className={inputClass(modoEdicion)}
@@ -172,6 +187,7 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
                       type="text"
                       name="apellidos"
                       defaultValue={paciente.apellidos}
+                      onInput={handleSoloLetrasInput}
                       readOnly={!modoEdicion}
                       required
                       className={inputClass(modoEdicion)}
@@ -184,6 +200,8 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
                       type="text"
                       name="cedula"
                       defaultValue={paciente.cedula || ''}
+                      onInput={(e) => handleSoloNumerosInput(e, 10)}
+                      maxLength={10}
                       readOnly={!modoEdicion}
                       className={inputClass(modoEdicion)}
                     />
@@ -225,6 +243,8 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
                       type="text"
                       name="telefono"
                       defaultValue={paciente.telefono || ''}
+                      onInput={(e) => handleSoloNumerosInput(e, 10)}
+                      maxLength={10}
                       readOnly={!modoEdicion}
                       className={inputClass(modoEdicion)}
                     />
@@ -275,6 +295,7 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
                         type="text"
                         name="contacto_emergencia_nombre"
                         defaultValue={paciente.contacto_emergencia_nombre || ''}
+                        onInput={handleSoloLetrasInput}
                         readOnly={!modoEdicion}
                         className={inputClass(modoEdicion)}
                       />
@@ -286,6 +307,8 @@ export function FilaPaciente({ paciente }: { paciente: any }) {
                         type="text"
                         name="contacto_emergencia_telefono"
                         defaultValue={paciente.contacto_emergencia_telefono || ''}
+                        onInput={(e) => handleSoloNumerosInput(e, 10)}
+                        maxLength={10}
                         readOnly={!modoEdicion}
                         className={inputClass(modoEdicion)}
                       />

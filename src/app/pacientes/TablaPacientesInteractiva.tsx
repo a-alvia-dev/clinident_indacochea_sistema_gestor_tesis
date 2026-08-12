@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { FilaPaciente } from './FilaPaciente';
 
 interface TablaPacientesProps {
@@ -9,6 +9,22 @@ interface TablaPacientesProps {
 
 export function TablaPacientesInteractiva({ pacientesIniciales }: TablaPacientesProps) {
   const [busqueda, setBusqueda] = useState('');
+  
+  // Referencia para dar foco automático al buscador
+  const inputBusquedaRef = useRef<HTMLInputElement>(null);
+
+  // Focus automático al montar el componente
+  useEffect(() => {
+    inputBusquedaRef.current?.focus();
+  }, []);
+
+  // Guardamos el ID del paciente que está abierto actualmente (null si todos están cerrados)
+  const [pacienteAbiertoId, setPacienteAbiertoId] = useState<string | null>(null);
+
+  const handleTogglePaciente = (id: string) => {
+    // Si se hace clic en el que ya está abierto, se cierra. Si no, se abre el nuevo y se cierra el anterior.
+    setPacienteAbiertoId((prevId) => (prevId === id ? null : id));
+  };
 
   // Filtra en memoria instantáneamente sin recargar la página ni perder el foco
   const pacientesFiltrados = pacientesIniciales.filter((paciente) => {
@@ -26,10 +42,12 @@ export function TablaPacientesInteractiva({ pacientesIniciales }: TablaPacientes
       {/* Buscador Ultra Fluido */}
       <div className="max-w-md">
         <input
+          ref={inputBusquedaRef}
           type="text"
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           placeholder="Buscar por nombre, apellido o cédula..."
+          autoFocus
           className="w-full px-4 py-2.5 bg-white border border-slate-300/80 rounded-xl text-[#0d1527] placeholder-slate-400 focus:outline-none focus:border-[#2B5566] focus:ring-1 focus:ring-[#2B5566] text-sm shadow-sm transition-all font-medium"
         />
       </div>
@@ -48,7 +66,12 @@ export function TablaPacientesInteractiva({ pacientesIniciales }: TablaPacientes
           <tbody className="divide-y divide-slate-100 text-sm font-medium text-slate-800">
             {pacientesFiltrados.length > 0 ? (
               pacientesFiltrados.map((paciente: any) => (
-                <FilaPaciente key={paciente.id} paciente={paciente} />
+                <FilaPaciente
+                  key={paciente.id}
+                  paciente={paciente}
+                  estaDesplegado={pacienteAbiertoId === paciente.id}
+                  onToggle={() => handleTogglePaciente(paciente.id)}
+                />
               ))
             ) : (
               <tr>
