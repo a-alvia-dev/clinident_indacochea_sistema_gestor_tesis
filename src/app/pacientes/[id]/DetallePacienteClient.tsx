@@ -1,8 +1,7 @@
 'use client';
-import { useRouter } from 'next/navigation';
-import Swal from 'sweetalert2';
 
 import { useState, useTransition, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   aperturarHistoriaAction, 
@@ -47,10 +46,15 @@ interface Props {
 }
 
 export default function DetallePacienteClient({ paciente: pacienteInicial, historiaInicial, id }: Props) {
-    const router = useRouter();
+  const router = useRouter();
   const [paciente, setPaciente] = useState(pacienteInicial);
   const [historiaId, setHistoriaId] = useState<string | null>(historiaInicial?.id || null);
   const [isPending, startTransition] = useTransition();
+
+  // Estados para controlar los Modales de Eliminar Historia
+  const [modalEliminar, setModalEliminar] = useState(false);
+  const [modalExitoEliminar, setModalExitoEliminar] = useState(false);
+  const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
 
   const parseArray = (val: any) => {
     if (Array.isArray(val)) return val;
@@ -65,7 +69,6 @@ export default function DetallePacienteClient({ paciente: pacienteInicial, histo
     return [];
   };
 
-  // Estados inicializados directamente desde las props del servidor
   const [antecedentes, setAntecedentes] = useState<string[]>(parseArray(historiaInicial?.antecedentes));
   const [alergias, setAlergias] = useState<string[]>(parseArray(historiaInicial?.alergias));
   const [habitos, setHabitos] = useState<string[]>(parseArray(historiaInicial?.habitos));
@@ -158,8 +161,6 @@ export default function DetallePacienteClient({ paciente: pacienteInicial, histo
     formData.append('habitos', JSON.stringify(habitos));
     formData.append('piezas', JSON.stringify(piezasClinicas));
 
-const esEdicion = Boolean(historiaId);
-
     startTransition(async () => {
       let res;
       if (historiaId) {
@@ -170,35 +171,9 @@ const esEdicion = Boolean(historiaId);
       }
 
       if (res?.error) {
-        Swal.fire({
-          title: '<span class="text-base font-bold text-slate-900">Error al guardar</span>',
-          text: res.error,
-          icon: 'error',
-          confirmButtonText: 'Aceptar',
-          buttonsStyling: false,
-          customClass: {
-            popup: 'rounded-2xl border border-slate-200 p-6 bg-white shadow-xl',
-            confirmButton: 'px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl cursor-pointer'
-          }
-        });
+        alert(`Error al guardar: ${res.error}`);
         return;
       }
-
-      // 🚀 MODAL DE ÉXITO DINÁMICO CON ESTILO TAILWIND
-      Swal.fire({
-        title: `<span class="text-lg font-bold text-slate-900">${esEdicion ? '¡Historia Actualizada!' : '¡Historia Guardada!'}</span>`,
-        html: `<p class="text-xs text-slate-500 font-medium mt-1">
-                 Los cambios fueron guardados y el semáforo <span class="font-bold uppercase">${colorCalculado}</span> fue calculado correctamente.
-               </p>`,
-        icon: 'success',
-        iconColor: '#10b981',
-        timer: 1800,
-        showConfirmButton: false,
-        buttonsStyling: false,
-        customClass: {
-          popup: 'rounded-2xl border border-slate-200/80 shadow-xl bg-white p-6'
-        }
-      });
 
       setResultadoSemaforo({ color: colorCalculado, razon: razonFinal });
       setConsultaFinalizada(true);
@@ -206,63 +181,32 @@ const esEdicion = Boolean(historiaId);
     });
   }, [id, historiaId, motivoConsulta, tipoDolor, nivelDolor, presionArterial, fiebre, otrosMeds, antecedentes, alergias, habitos, piezasClinicas]);
 
-// ELIMINAR HISTORIA CLINICA CON ESTILOS MATCH TAILWIND
-  const handleEliminarHistoria = useCallback(() => {
+  // 🗑️ LÓGICA DE ELIMINACIÓN DE HISTORIA CLÍNICA (REACT MODAL NATIVO)
+  const handleConfirmarEliminarHistoria = useCallback(() => {
     if (!historiaId) return;
 
-    Swal.fire({
-      title: '<span class="text-lg font-bold text-slate-900">¿Eliminar historia clínica?</span>',
-      html: '<p class="text-xs text-slate-500 font-medium mt-1">Esta acción eliminará el registro médico del paciente de forma permanente.</p>',
-      icon: 'warning',
-      iconColor: '#f43f5e',
-      showCancelButton: true,
-      confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar',
-      buttonsStyling: false, // 👈 Desactiva los estilos feos por defecto de SweetAlert
-      customClass: {
-        popup: 'rounded-2xl border border-slate-200/80 shadow-xl bg-white p-6',
-        confirmButton: 'px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer mr-2',
-        cancelButton: 'px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer',
-      }
-    }).then((result) => {
-      if (result.isConfirmed) {
-        startTransition(async () => {
-          const res = await eliminarHistoriaAction(historiaId, id);
-          
-          if (res?.error) {
-            Swal.fire({
-              title: '<span class="text-base font-bold text-slate-900">Error al eliminar</span>',
-              text: res.error,
-              icon: 'error',
-              confirmButtonText: 'Aceptar',
-              buttonsStyling: false,
-              customClass: {
-                popup: 'rounded-2xl border border-slate-200 p-6',
-                confirmButton: 'px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl'
-              }
-            });
-            return;
-          }
+    setErrorEliminar(null);
 
-          Swal.fire({
-            title: '<span class="text-base font-bold text-slate-900">¡Historia Eliminada!</span>',
-            text: 'Redirigiendo a la lista de pacientes...',
-            icon: 'success',
-            iconColor: '#10b981',
-            timer: 1500,
-            showConfirmButton: false,
-            buttonsStyling: false,
-            customClass: {
-              popup: 'rounded-2xl border border-slate-200 p-6'
-            }
-          });
+    startTransition(async () => {
+      const res = await eliminarHistoriaAction(historiaId, id);
 
-          router.push('/pacientes');
-          router.refresh();
-        });
+      if (res?.error) {
+        setErrorEliminar(res.error);
+        return;
       }
+
+      setModalEliminar(false);
+      setModalExitoEliminar(true);
+
+      setTimeout(() => {
+        setModalExitoEliminar(false);
+        router.push('/pacientes');
+        router.refresh();
+      }, 1800);
     });
   }, [historiaId, id, router]);
+
+  const nombrePaciente = `${paciente.nombres} ${paciente.apellidos}`.trim();
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20">
@@ -313,10 +257,16 @@ const esEdicion = Boolean(historiaId);
               <p className="text-sm font-semibold text-slate-700 mt-1">Ficha registrada correctamente en el sistema</p>
             </div>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setConsultaFinalizada(false)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5">
+              <button type="button" onClick={() => setConsultaFinalizada(false)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer">
                 ✏️ Modificar / Editar Historia
               </button>
-              <button type="button" onClick={handleEliminarHistoria} disabled={isPending} className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5">
+              {/* Botón que abre el modal de eliminación */}
+              <button 
+                type="button" 
+                onClick={() => setModalEliminar(true)} 
+                disabled={isPending} 
+                className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
                 🗑️ Eliminar Historia
               </button>
             </div>
@@ -515,7 +465,7 @@ const esEdicion = Boolean(historiaId);
               <div className="p-5 bg-slate-100 rounded-2xl border border-slate-300 space-y-4">
                 <div className="flex justify-between items-center border-b border-slate-200 pb-2">
                   <h3 className="text-sm font-extrabold text-[#0d1527]">Anotación para Pieza Dental #{piezaSeleccionada}</h3>
-                  <button type="button" onClick={() => setPiezaSeleccionada(null)} className="text-xs font-bold text-slate-400 hover:text-slate-600">✕ Cancelar</button>
+                  <button type="button" onClick={() => setPiezaSeleccionada(null)} className="text-xs font-bold text-slate-400 hover:text-slate-600 cursor-pointer">✕ Cancelar</button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                   <div>
@@ -546,7 +496,7 @@ const esEdicion = Boolean(historiaId);
                   <input type="text" value={notaTemp} onChange={(e) => setNotaTemp(e.target.value)} placeholder="Ej. Movilidad grado 1..." className="w-full p-2.5 bg-white rounded-xl border border-slate-300 text-xs text-slate-900" />
                 </div>
                 <div className="flex justify-end">
-                  <button type="button" onClick={agregarPiezaDental} className="px-5 py-2.5 bg-[#2B5566] text-white text-xs font-bold rounded-xl hover:bg-[#1f3e4b]">
+                  <button type="button" onClick={agregarPiezaDental} className="px-5 py-2.5 bg-[#2B5566] text-white text-xs font-bold rounded-xl hover:bg-[#1f3e4b] cursor-pointer">
                     Guardar Pieza #{piezaSeleccionada}
                   </button>
                 </div>
@@ -575,7 +525,7 @@ const esEdicion = Boolean(historiaId);
                           <td className="py-2.5 px-3 font-semibold text-slate-900">{p.tratamiento}</td>
                           <td className="py-2.5 px-3 text-slate-500">{p.nota || '-'}</td>
                           <td className="py-2.5 px-3 text-right">
-                            <button type="button" onClick={() => eliminarPieza(p.pieza)} className="text-red-500 font-bold hover:underline">Eliminar</button>
+                            <button type="button" onClick={() => eliminarPieza(p.pieza)} className="text-red-500 font-bold hover:underline cursor-pointer">Eliminar</button>
                           </td>
                         </tr>
                       ))}
@@ -590,6 +540,84 @@ const esEdicion = Boolean(historiaId);
             {isPending ? 'Guardando...' : historiaId ? 'Actualizar Historia Clínica' : 'Finalizar Consulta'}
           </button>
         </form>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 🔴 MODAL 1: CONFIRMACIÓN PARA ELIMINAR HISTORIA CLÍNICA                   */}
+      {/* ========================================================================= */}
+      {modalEliminar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-[28px] p-8 max-w-sm w-full shadow-2xl text-center space-y-4">
+            <div className="w-16 h-16 mx-auto rounded-full bg-rose-50 text-rose-500 flex items-center justify-center border-2 border-rose-500">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+            </div>
+
+            <div>
+              <h3 className="text-2xl font-black text-[#0d1527] tracking-tight">
+                ¿Eliminar Historia Clínica?
+              </h3>
+              <p className="text-slate-500 text-sm mt-2 leading-relaxed">
+                ¿Estás seguro de eliminar la historia de <span className="font-bold text-slate-700">{nombrePaciente}</span>? Esta acción borrará sus datos del sistema.
+              </p>
+            </div>
+
+            {errorEliminar && (
+              <div className="p-3 rounded-xl bg-rose-50 text-rose-700 text-xs font-semibold">
+                {errorEliminar}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setModalEliminar(false)}
+                disabled={isPending}
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmarEliminarHistoria}
+                disabled={isPending}
+                className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-colors shadow-md disabled:opacity-50 cursor-pointer"
+              >
+                {isPending ? 'Eliminando...' : 'Sí, eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 🟢 MODAL 2: ÉXITO TRAS ELIMINAR LA HISTORIA CLÍNICA                        */}
+      {/* ========================================================================= */}
+      {modalExitoEliminar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-[28px] p-8 max-w-sm w-full shadow-2xl text-center space-y-4">
+            <div className="w-16 h-16 mx-auto rounded-full bg-white text-emerald-500 flex items-center justify-center border-2 border-emerald-500">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+
+            <div>
+              <h3 className="text-2xl font-black text-[#0d1527] tracking-tight">
+                ¡Historia Eliminada!
+              </h3>
+              <p className="text-slate-500 text-sm mt-2 leading-relaxed">
+                La historia clínica se ha eliminado correctamente del sistema. Redirigiendo...
+              </p>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
