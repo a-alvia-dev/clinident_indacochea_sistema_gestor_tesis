@@ -8,6 +8,7 @@ import { crearPacienteAction } from '../actions';
 export default function NuevoPacientePage() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [mostrarModalExito, setMostrarModalExito] = useState(false);
   const primerInputRef = useRef<HTMLInputElement>(null);
 
   // Autofocus en el campo Nombres al cargar la página
@@ -19,10 +20,9 @@ export default function NuevoPacientePage() {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
     if (e.key === 'Enter') {
       const target = e.target as HTMLElement;
-      // Si el foco está en un botón o link de cancelar, permitimos el comportamiento normal
       if (target.tagName === 'BUTTON' || target.tagName === 'A') return;
 
-      e.preventDefault(); // Evita el submit prematuro
+      e.preventDefault();
 
       const form = e.currentTarget;
       const focusableElements = Array.from(
@@ -36,15 +36,14 @@ export default function NuevoPacientePage() {
     }
   };
 
-  // Validaciones en tiempo real y bocadillos en español
+  // Validaciones en tiempo real
   const handleInputValidation = (e: React.FormEvent<HTMLInputElement>) => {
     const input = e.currentTarget;
-    input.setCustomValidity(''); // Resetea el error anterior
+    input.setCustomValidity('');
 
     const name = input.name;
     const value = input.value;
 
-    // Validación Cédula/DNI
     if (name === 'cedula') {
       const soloNumeros = value.replace(/\D/g, '');
       if (value !== soloNumeros) {
@@ -55,7 +54,6 @@ export default function NuevoPacientePage() {
       }
     }
 
-    // Validación Nombres, Apellidos y Contacto Emergencia
     if (['nombres', 'apellidos', 'contacto_emergencia_nombre'].includes(name)) {
       const soloLetras = value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
       if (value !== soloLetras) {
@@ -64,7 +62,6 @@ export default function NuevoPacientePage() {
       }
     }
 
-    // Validación Teléfonos
     if (['telefono', 'contacto_emergencia_telefono'].includes(name)) {
       const soloNumeros = value.replace(/\D/g, '');
       if (value !== soloNumeros) {
@@ -93,9 +90,12 @@ export default function NuevoPacientePage() {
     startTransition(async () => {
       const res = await crearPacienteAction(formData);
       if (res.success) {
-        router.push('/pacientes');
+        // Mostramos el modal de éxito y redirigimos
+        setMostrarModalExito(true);
+        setTimeout(() => {
+          router.push('/pacientes');
+        }, 2000);
       } else {
-        // En caso de error de servidor, se lo asignamos al input de Cédula como alerta en diálogo nativo
         const cedulaInput = e.currentTarget.querySelector<HTMLInputElement>('input[name="cedula"]');
         if (cedulaInput) {
           cedulaInput.setCustomValidity(res.error || 'Error al guardar el paciente en el sistema.');
@@ -106,7 +106,7 @@ export default function NuevoPacientePage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6 relative">
       
       {/* Volver & Encabezado */}
       <div>
@@ -346,6 +346,40 @@ export default function NuevoPacientePage() {
         </div>
 
       </form>
+
+      {/* MODAL DE ÉXITO LIMPIO (SIN BOTÓN ACEPTAR) */}
+      {mostrarModalExito && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100 text-center space-y-6 transform animate-scaleUp">
+            
+            {/* Ícono de Check Verde Identico */}
+            <div className="w-20 h-20 mx-auto rounded-full border-[3px] border-emerald-500 flex items-center justify-center text-emerald-500">
+              <svg 
+                className="w-10 h-10 stroke-current" 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                strokeWidth="2.5"
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+
+            {/* Texto y Mensaje */}
+            <div className="space-y-2 pb-2">
+              <h3 className="text-2xl font-black text-[#0d1527] tracking-tight">
+                ¡Paciente Registrado!
+              </h3>
+              <p className="text-sm font-medium text-slate-500 max-w-xs mx-auto">
+                Los datos personales y de contacto se guardaron correctamente en el sistema.
+              </p>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
